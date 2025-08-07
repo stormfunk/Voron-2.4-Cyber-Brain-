@@ -1,12 +1,12 @@
 # Voron 2.4 350mm - "Cyber Brain" Configuration
 
-This repository contains the complete Klipper configuration for my Voron 2.4 350mm 3D printer, automatically backed up via the printer's built-in git integration. The printer features a high-performance setup optimized for speed, precision, and reliability.
+This repository contains the complete Klipper configuration for my Voron 2.4 350mm 3D printer, automatically backed up via the printer's built-in git integration.
 
 ## 🗂️ Repository Purpose
 
 - **Automatic Backups**: Configuration files are automatically committed and pushed after every significant change
 - **Version Control**: Track configuration evolution and easily rollback problematic changes  
-- **Sharing**: Document and share working configurations with the community
+- **Sharing**: Document and share working configurations
 - **Disaster Recovery**: Complete config restoration capability
 
 ![Voron 2.4 Full View](images/voron-full-view.jpeg)
