@@ -10,7 +10,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 - **Disaster Recovery**: Complete config restoration capability
 
 ![Voron 2.4 Full View](images/voron-full-view.jpeg)
-
+![Voron 2.4 Full View](images/Full Shot.jpg)
 ## 🔧 Hardware Configuration
 
 ### Main Components
