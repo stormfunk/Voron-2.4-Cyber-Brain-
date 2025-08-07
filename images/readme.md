@@ -4,7 +4,7 @@ This folder contains images of the printer.
 
 
 
-![front shot](images/NEON.JPG)
+![front shot](NEON.JPG)
 
 
 ---
