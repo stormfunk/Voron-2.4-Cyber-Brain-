@@ -4,7 +4,7 @@ This folder contains images of the printer.
 
 
 
-![front shot](NEON.JPG)
+![NEON-GENESIS INSPIRED](NEON.jpeg)
 
 
 ---
