@@ -11,7 +11,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 
 ![Voron 2.4 Full View](images/voron-full-view.jpeg)
 
-![full shot](images/full shot.JPG)
+![full shot](images/full_shot.JPG)
 
 ## 🔧 Hardware Configuration
 
