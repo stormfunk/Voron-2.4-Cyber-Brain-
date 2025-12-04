@@ -2,7 +2,7 @@
 
 This repository contains the complete Klipper configuration for my Voron 2.4 350mm 3D printer, automatically backed up via the printer's built-in git integration.
 
-## 🗂️ Repository Purpose
+## Repository Purpose
 
 - **Automatic Backups**: Configuration files are automatically committed and pushed after every significant change
 - **Version Control**: Track configuration evolution and easily rollback problematic changes  
@@ -13,12 +13,12 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 
 ![front shot](images/front_shot.JPG)
 
-## 🔧 Hardware Configuration
+## Hardware Configuration
 
 ### Main Components
 - **Frame**: Voron 2.4 350mm (LDO Kit)
 - **Toolhead**: Archetype Mjolnir
-- **Extruder**: Sherpa Mini (50:10 gear ratio)
+- **Extruder**: Protoxtruder 2.0 with HGX-lite gears (44:10 gear ratio)
 - **Hotend**: Rapido UHF (PT1000, 330°C max)
 - **Probe**: Cartographer V2 (touch sensor with dedicated MCU)
 
@@ -42,7 +42,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 - **Toolhead LEDs**: 3x GRBW Stealthburner lighting
 - **Webcam**: 1280x720@30fps via Crowsnest
 
-## 💾 Software Stack
+## Software Stack
 
 ### Core Firmware
 - **Klipper**: Multi-MCU configuration (3x controllers)
@@ -56,7 +56,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 - **LED Effects**: Dynamic lighting based on printer state
 - **Mobileraker**: Mobile app integration with push notifications
 
-## 🚀 Key Features
+## Key Features
 
 ### Automated Print Workflow
 - **Smart Start Sequence**: Adaptive bed mesh, gantry leveling, nozzle cleaning
@@ -76,7 +76,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 - **Precision Probing**: Dual-pass mesh with 0.0075mm tolerance
 - **Input Shaping**: EI (X: 89.8Hz) / MZV (Y: 48.8Hz)
 
-## 📁 Configuration Structure
+## Configuration Structure
 
 ```
 ├── printer.cfg              # Main configuration file
@@ -92,7 +92,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 └── autocommit.sh           # Automatic backup script
 ```
 
-## ⚡ Performance Specifications
+## Performance Specifications
 
 - **Print Speed**: Up to 300mm/s (material dependent)
 - **Travel Speed**: 800mm/s
@@ -101,7 +101,7 @@ This repository contains the complete Klipper configuration for my Voron 2.4 350
 - **First Layer Precision**: Cartographer touch sensing
 - **Heat-up Time**: ~3min to ABS temps (110°C bed, 250°C hotend)
 
-## 🔄 Automatic Backup
+## Automatic Backup
 
 The printer runs a git-based backup system that:
 
@@ -112,14 +112,14 @@ The printer runs a git-based backup system that:
 
 **Backup Script**: `autocommit.sh` runs after significant config changes
 
-## 📱 Remote Monitoring
+## Remote Monitoring
 
 - **Mainsail Interface**: Full remote control and monitoring
 - **Mobileraker**: iOS/Android app with notifications
 - **Webcam Stream**: Live print monitoring at `/webcam`
 - **Timelapse**: Automatic print recording and rendering
 
-## 🛠️ Notable Customizations
+## Notable Customizations
 
 ### Intelligent Start Sequence
 The `PRINT_START` macro provides a comprehensive pre-print routine including temperature-dependent heat soaking, adaptive mesh probing, and nozzle preparation.
@@ -137,6 +137,6 @@ Extensive library including filament management, calibration routines, and diagn
 
 **Last Updated**: Auto-generated on commit  
 **Klipper Version**: Latest stable  
-**Hardware Status**: Fully operational ✅
+**Hardware Status**: Fully operational
 
 > This configuration represents hundreds of hours of tuning and optimization. Feel free to use as reference, but always verify settings match your specific hardware before applying.
