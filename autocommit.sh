@@ -84,7 +84,16 @@ fi
 
 push_config(){
   cd $config_folder
+
+  # Stash local versions of files we want to keep
+  git stash push -u readme.md images/ config_backups/ 2>/dev/null || true
+
   git pull origin $branch --no-rebase
+
+  # Restore our local versions, overwriting what was pulled
+  git stash pop 2>/dev/null || true
+  git reset HEAD readme.md images/ config_backups/ 2>/dev/null || true
+
   git add .
   current_date=$(date +"%Y-%m-%d %T")
   git commit -m "Autocommit from $current_date" -m "$m1" -m "$m2" -m "$m3" -m "$m4"
