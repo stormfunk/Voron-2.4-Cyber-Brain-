@@ -88,7 +88,24 @@ push_config(){
   # Stash local versions of files we want to keep
   git stash push -u readme.md images/ config_backups/ 2>/dev/null || true
 
-  git pull origin $branch --no-rebase
+  # Pull remote changes, detect merge conflicts
+  if ! git pull origin $branch --no-rebase; then
+    echo "Merge conflict detected during pull. Resolving by keeping local config..."
+    # Find conflicted files and keep our (local) version
+    conflicted_files=$(git diff --name-only --diff-filter=U)
+    if [ -n "$conflicted_files" ]; then
+      echo "Conflicted files: $conflicted_files"
+      echo "$conflicted_files" | while read -r file; do
+        git checkout --ours "$file"
+        git add "$file"
+      done
+      git commit -m "Auto-resolved merge conflict, kept local config"
+    else
+      # Pull failed for a non-conflict reason, abort merge if in progress
+      git merge --abort 2>/dev/null || true
+      echo "Pull failed but no conflicts found. Skipping pull."
+    fi
+  fi
 
   # Restore our local versions, overwriting what was pulled
   git stash pop 2>/dev/null || true
@@ -102,3 +119,4 @@ push_config(){
 
 grab_version
 push_config
+
