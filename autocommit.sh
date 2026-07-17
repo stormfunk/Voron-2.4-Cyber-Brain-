@@ -85,8 +85,15 @@ fi
 push_config(){
   cd $config_folder
 
+  # Keep GitHub-only files (readme, images) OUT of the printer's working tree.
+  # sparse-checkout: they stay tracked in the repo/on GitHub, but git will not
+  # materialize them locally on pull. Idempotent, runs every backup.
+  git config core.sparseCheckout true
+  printf '/*\n!/readme.md\n!/README.md\n!/images/\n!/Images/\n' > .git/info/sparse-checkout
+  git read-tree -mu HEAD 2>/dev/null || true
+
   # Stash local versions of files we want to keep
-  git stash push -u readme.md images/ config_backups/ 2>/dev/null || true
+  git stash push -u config_backups/ 2>/dev/null || true
 
   # Pull remote changes, detect merge conflicts
   if ! git pull origin $branch --no-rebase; then
@@ -109,7 +116,7 @@ push_config(){
 
   # Restore our local versions, overwriting what was pulled
   git stash pop 2>/dev/null || true
-  git reset HEAD readme.md images/ config_backups/ 2>/dev/null || true
+  git reset HEAD config_backups/ 2>/dev/null || true
 
   git add .
   current_date=$(date +"%Y-%m-%d %T")
@@ -119,4 +126,3 @@ push_config(){
 
 grab_version
 push_config
-
