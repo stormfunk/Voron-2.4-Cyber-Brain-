@@ -93,6 +93,8 @@ push_config(){
   git read-tree -mu HEAD 2>/dev/null || true
 
   # Stash local versions of files we want to keep
+  # nuke any stale/poisoned stash first - we only use our own within this run
+  git stash clear 2>/dev/null || true
   git stash push -u config_backups/ 2>/dev/null || true
 
   # Pull remote changes, detect merge conflicts
