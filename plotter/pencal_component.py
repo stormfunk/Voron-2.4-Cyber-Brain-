@@ -11,7 +11,12 @@
 #   3) adjust the pen in the collet (or jog Z) until the tip just touches
 #   4) store   -> saves that exact position as this pen's datum
 # Pen 1 is the datum; the others are stored relative to it.
-# Inputs: collet, cal_pos, store, apply, table, clear (buttons), pen(1-8)
+#
+# COMMIT folds a live trim into the stored datum: if you babystep mid-plot to
+# fix a pen sitting high, commit makes that correction permanent instead of
+# losing it at the end of the job. Nothing moves when it runs. Pen 1 is the
+# datum so it cannot absorb a trim - that error belongs in pen_down_z.
+# Inputs: collet, cal_pos, store, apply, commit, table, clear (buttons), pen(1-8)
 import urllib
 import urllib2
 
@@ -66,6 +71,14 @@ try:
     elif apply:
         send('PEN_APPLY PEN=%d' % PEN)
         msg = 'pen %d offsets applied  |  %s' % (PEN, read_table())
+    elif commit:
+        if PEN == 1:
+            msg = ('pen 1 is the DATUM - a trim on it cannot be stored (it would '
+                   'just re-zero itself). Adjust pen_down_z instead, or re-run '
+                   'STORE at the cal dot to move the datum.')
+        else:
+            send('PEN_COMMIT PEN=%d' % PEN)
+            msg = 'pen %d trim committed to its datum  |  %s' % (PEN, read_table())
     elif table:
         send('PEN_TABLE')
         msg = 'TABLE: %s' % read_table()

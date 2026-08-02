@@ -84,6 +84,18 @@ alignment out. The flow is: fit the pen at the collet position, go to the
 calibration point, jog the tip onto the dot by hand, then STORE. `apply` loads
 that pen's offset; `table` prints what is stored; `clear` forgets one.
 
+**`commit` makes a mid-plot babystep permanent.** You are plotting, a pen sits
+slightly high, you nudge it with the live trim — and that nudge normally dies
+with the job. Commit folds it into the pen's stored datum instead. Nothing moves
+when it runs: the live offset is left alone and the datum is changed by exactly
+the amount that makes `PEN_APPLY` reproduce it, so committing mid-pass cannot
+disturb the drawing.
+
+Pen 1 is the exception, and deliberately so. It *is* the datum every other pen
+is measured against, so a trim on pen 1 cannot be folded into the table — it
+would only re-zero itself. A pen 1 height error is a global draw-height error:
+change `pen_down_z` instead, or re-run STORE at the cal dot to move the datum.
+
 ### Pen trim — live nudges mid-plot
 
 ![pen trim](screenshots/canvas/pen_trim.png)
@@ -281,6 +293,7 @@ welded 12 touching stroke ends (12 pen lifts saved)
 | `circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
 | `pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
 | `ascii_component.py` | ASCII SHADER: image → shape-matched characters |
+| `pen_commit_macros.cfg` | `PEN_COMMIT` / `PEN_TWEAK` — append to the printer's `pen_macros.cfg` |
 | `pen_widths.json` | Line weight per pen |
 | `paper_registration.json` | Last taught paper corners (also on the printer) |
 | `titleblock_brief.md` | Design brief the titleblock SVG was generated from |
@@ -300,8 +313,15 @@ welded 12 touching stroke ends (12 pen lifts saved)
 | `PEN_CAL_POS` | Move to the calibration dot (nozzle coords) |
 | `PEN_CALIBRATE` | Store the current position as this pen's datum |
 | `PEN_APPLY PEN=n` | Load pen n's stored offset |
+| `PEN_COMMIT PEN=n` | Fold the live trim into pen n's datum (nothing moves) |
+| `PEN_TWEAK PEN=n Z=-0.2` | Adjust a stored datum after the fact |
 | `PEN_TABLE` | Print the stored table |
 | `PEN_CLEAR_CAL PEN=n` | Forget pen n |
+
+`PEN_COMMIT` and `PEN_TWEAK` are staged in `pen_commit_macros.cfg` — append them
+to `pen_macros.cfg` on the printer. They assume `PEN_APPLY` sets the offset to
+`pen_cal_N - pen_cal_1`; if it computes it differently, only the three
+`ax/ay/az` lines in `PEN_COMMIT` need to change.
 
 ---
 
@@ -320,6 +340,8 @@ welded 12 touching stroke ends (12 pen lifts saved)
 5. **Seat each pen.** It presents just off the paper edge; seat the pen to the
    bed surface, tighten, `PEN_RESUME`. Repeat per pass — the display names the
    pen to load. Pen-change dots always land outside the paper margins.
+   If a pen needs a nudge once it is drawing, trim it live — and press `commit`
+   so you do not have to make the same nudge next time.
 6. **End of plot** parks centred in X toward the back, steppers left on, so the
    paper can be lifted off cleanly.
 
