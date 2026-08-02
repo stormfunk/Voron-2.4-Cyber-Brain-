@@ -144,6 +144,31 @@ if _praw and _pmax > 0.001:
 
 bed = [rg.Rectangle3d(rg.Plane.WorldXY, rg.Interval(0, BED), rg.Interval(0, BED)).ToNurbsCurve()]
 paper = []; labels = []
+
+# ---- unreachable zone: the pen sits OFFY in front of the nozzle, so when the
+# nozzle hits its Y limit the pen still stops short - that back strip can never
+# be drawn on. Shown as a diagonally hatched red band.
+OFFY_HW = -58.0                     # pen offset from nozzle (hardware constant)
+view_exclusion = []
+_ylim = BED + OFFY_HW               # highest Y the PEN can reach
+if _ylim < BED - 0.5:
+    _ex = rg.Rectangle3d(rg.Plane.WorldXY, rg.Interval(0, BED), rg.Interval(_ylim, BED)).ToNurbsCurve()
+    view_exclusion.append(_ex)
+    _hs = 9.0                       # hatch spacing
+    _c = -BED
+    while _c < BED * 2.0:
+        _l = rg.LineCurve(rg.Point3d(-BED, -BED + _c, 0), rg.Point3d(BED * 2.0, BED * 2.0 + _c, 0))
+        _xev = rg.Intersect.Intersection.CurveCurve(_l, _ex, 0.001, 0.001)
+        _ts = []
+        if _xev is not None:
+            for _ev in _xev:
+                _ts.append(_ev.ParameterA)
+        if len(_ts) >= 2:
+            _ts.sort()
+            _seg = _l.Trim(_ts[0], _ts[-1])
+            if _seg is not None and _seg.GetLength() > 0.5:
+                view_exclusion.append(_seg)
+        _c += _hs
 if fr.get("p0"):     # paper whenever corners known (frame is already pen-space)
     p0 = [fr["p0"][0], fr["p0"][1]]
     eu = fr["eu"]; ev = fr["ev"]

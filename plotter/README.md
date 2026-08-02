@@ -1,89 +1,333 @@
 # Voron 2.4 Pen Plotter Pipeline
 
-Grasshopper-driven pen plotter running on the Voron 2.4 (350) via Klipper/Moonraker.
-Parametric linework generators -> multi-pen G-code with paper registration,
-self-calibrating pen height, and a preview that renders the exact emission plan.
+A pen plotter that runs on the Voron 2.4 (350) without modifying the printer:
+Grasshopper generates the linework, this pipeline turns it into multi-pen
+G-code, and Klipper macros handle registration, pen swaps and per-pen
+calibration. The Rhino viewport is a digital twin — the bed, the registered
+sheet of paper and the exact emission plan, drawn at the pen widths that will
+actually lay the ink.
 
 ![digital twin](screenshots/digital_twin_perspective.png)
+
+---
 
 ## Architecture
 
 ```
-GENERATORS            LAYER TABLE         PLACE              GCODE                PREVIEW
-mesh / lake /   ->    6 slots, one   ->   registration  ->   passes by pen,  ->   draws the actual
-radial / baked        pen # each          fit / lock /       signature,           plan, 8 pen
-+ DOTS ingest         (0 = off)           direct bypass      manifest             colours, paper slab
-+ processors: DASH, CHROMATIC ABERRATION, and eight region fills - HATCH
-  (lines/concentric), HILBERT, FLOW FIELD, SERPENTINE, TRUCHET, STIPPLE/TSP,
-  DIFFERENTIAL GROWTH, CONTOUR
+GENERATORS         PROCESSORS          LAYER TABLE      THINOUT       PLACE            GCODE            PREVIEW
+mesh / lake /  ->  chained freely  ->  6 slots,     ->  drops     ->  registration ->  passes by    ->  draws the
+radial / baked     curves in,          one pen #        ink the       fit / lock /     pen, ordered     actual plan,
++ DOTS ingest      curves out          each             pen can       direct bypass    travel,          8 pen colours,
+                   + `on` bypass       (0 = off)        not resolve                    manifest         paper slab
+                                                                          ^
+                                            TITLEBLOCK ----------------- merges into GCODE as a
+                                            (sizes itself to the paper)  second source after PLACE
 ```
 
-All processors share one contract - curves in, curves out, plus an `on` bypass -
-so they chain freely (hatch a region, dash the result, split it through
-chromatic aberration onto separate pens...).
+Every processor shares one contract — `crvs` in, `out_crvs` out, plus an `on`
+bypass — so they chain in any order. Hatch a region, dash the result, split it
+through chromatic aberration onto separate pens, crop it to a shape.
+
+### Conventions worth knowing
+
+- **Everything is pen-space.** The whole pipeline works in physical *ink*
+  positions. The pen sits **58 mm in front of the nozzle**; that offset is
+  applied only when G-code text is written. Nothing upstream ever thinks about
+  the nozzle.
+- **Z is the pressure channel.** A curve's Z coordinate is a pressure offset in
+  mm (spring pen mount, negative = press harder), emitted only when it changes.
+  Because pressure rides on the geometry it survives resampling, PLACE's fit
+  scaling and chaining — so stacked PRESSURE blocks *add*. `pressure_gain` on
+  GCODE scales the whole channel at emission (0 = plot flat) without re-running
+  anything upstream.
+- **Pen palette (also the pass order):**
+
+  | # | Pen | Width |
+  |---|---|---|
+  | 1 | BLACK FINE | 0.3 mm |
+  | 2 | BLACK BOLD | 0.7 mm |
+  | 3 | BLACK ROLLER | 0.8 mm |
+  | 4 | RED FINE | 0.3 mm |
+  | 5–8 | CUSTOM 1–4 | — |
+
+  Widths live in `pen_widths.json` and do real work: they set THINOUT's culling
+  distance per pen and drive the viewport preview lineweight.
+
+---
+
+## Canvas tour
+
+### Paper registration — teaching the machine where the sheet is
+
+![paper registration](screenshots/canvas/paper_registration.png)
+
+Jog the pen to three corners of the sheet and press the buttons. Klipper stores
+the corners in `save_variables`; the buttons pull the result straight back into
+Grasshopper so the paper outline updates live in the viewport as each corner
+lands. This handles a **skewed** sheet — the paper frame is derived from the
+three points, so artwork is rotated to match rather than assuming square.
+
+![registration sync](screenshots/canvas/registration_sync.png)
+
+The area behind the paper that the pen physically cannot reach (a consequence
+of the 58 mm offset) is drawn as a red hatched exclusion zone.
+
+![exclusion zone](screenshots/exclusion_zone.png)
+
+### Pen tool table — per-pen XYZ datums
+
+![pen tool table](screenshots/canvas/pen_tool_table.png)
+
+A CNC-style tool table. Each pen gets its own stored XYZ datum, **independent
+of plot order**, so swapping a fat pen for a thin one no longer throws the
+alignment out. The flow is: fit the pen at the collet position, go to the
+calibration point, jog the tip onto the dot by hand, then STORE. `apply` loads
+that pen's offset; `table` prints what is stored; `clear` forgets one.
+
+### Pen trim — live nudges mid-plot
+
+![pen trim](screenshots/canvas/pen_trim.png)
+
+The babystep analogue, on all three axes. X/Y shift *where the drawing lands*;
+Z is pen height. Use during a plot when a pen sits a little differently than
+when it was calibrated.
+
+### Pen widths
+
+![pen widths](screenshots/canvas/pen_widths.png)
+
+Store the real line weight of each pen once. THINOUT then culls automatically at
+the right distance and the viewport draws at the right thickness — no manual
+spacing parameter to keep in sync.
+
+![lineweight preview](screenshots/lineweight_preview.png)
+
+### Generators and the layer table
+
+![generators](screenshots/canvas/generators.png)
+
+Pattern generators are just curve sources — baked Rhino curves work equally
+well, and slot 1 is wired for exactly that.
+
+![layer table](screenshots/canvas/layer_table.png)
+
+Six slots, each assigned a pen number (0 = off). Slots are interchangeable:
+any curves into any slot. The pen number, not the slot, decides which pass the
+linework ends up in.
+
+### Processors
+
+![line processors](screenshots/canvas/processors_line.png)
+
+DASH, VARIABLE DASH (ink/gap driven by length or attractor proximity),
+CHROMATIC ABERRATION (splits a curve into offset colour steps across pens),
+CROP (clips to any closed shape, even-odd so nested shapes cut holes), and
+PRESSURE (writes the Z channel from curvature / proximity / image / noise).
+
+### Region fills
+
+![fills](screenshots/canvas/fills.png)
+
+Eight ways to fill a closed region:
+
+| Fill | Character |
+|---|---|
+| HATCH | parallel lines or concentric insets (Clipper2) |
+| HILBERT | space-filling curve, one continuous stroke |
+| FLOW FIELD | evenly-spaced streamlines through a noise field (Jobard–Lefebvre) |
+| SERPENTINE | scanlines snaked together, pen never lifts |
+| TRUCHET | random arc/diagonal tiles chained into loops |
+| STIPPLE / TSP | blue-noise dots, or one continuous tour through them |
+| DIFFERENTIAL GROWTH | self-repelling loop folded into coral forms |
+| CONTOUR | noise terrain sliced into topographic iso-lines |
 
 ![fill patterns](screenshots/fill_patterns.png)
 ![fill patterns 2](screenshots/fill_patterns2.png)
 
-- **Coordinate convention:** the whole pipeline works in PEN-SPACE (physical ink
-  positions). The pen sits 54.5mm in front of the nozzle; the offset is applied
-  only when G-code text is written.
-- **Pressure channel:** a curve's Z coordinate = pressure offset in mm (spring
-  pen mount; negative = press harder). Emitted only when it changes.
-  The PRESSURE processor writes it (curvature / proximity / image / noise);
-  because it rides on the geometry it survives resampling, PLACE's fit scaling
-  and chaining, so stacked PRESSURE blocks ADD. GCODE's `pressure_gain` scales
-  the whole channel at emission (0 = plot flat) without re-running anything.
-- **Pen palette (pass order):** 1 BLACK, 2 RED, 3 GREEN, 4 BLUE, 5 YELLOW,
-  6 ORANGE, 7 AQUA, 8 PINK.
+### Image processors
+
+![pointillism](screenshots/canvas/pointillism.png)
+
+POINTILLISM turns an image into dots — density, halftone or scattered, each dot
+spiral-filled so it reads as a solid at pen width.
+
+![pointillism](screenshots/point_halftone.png)
+
+![ascii](screenshots/canvas/ascii.png)
+
+ASCII SHADER renders an image as drawn characters. Rather than mapping
+brightness onto a ramp (which turns edges to mush), each cell is sampled into a
+3×3 grid — a 9-component *shape vector* — and the character whose own ink
+distribution best matches is chosen. Character vectors are measured from the
+real stroke geometry, so they stay honest if the font changes. An edge running
+bottom-left to top-right picks `/`; a horizontal one picks `=` or `_`. The
+`edge` slider trades shape-matching against pure density.
+(Technique after [alexharri.com/blog/ascii-rendering](https://alexharri.com/blog/ascii-rendering).)
+
+![ascii compare](screenshots/ascii_compare.png)
+
+### THINOUT — dropping ink the pen cannot resolve
+
+![thinout](screenshots/canvas/thinout.png)
+
+Sits in the main flow (with a bypass). When strokes run closer together than the
+pen is wide, the second lays ink on top of the first: no visual gain, full
+plot-time cost. THINOUT walks each pen's curves — culling each pen against
+*itself* only, since a red stroke beside a black one is not redundant — and
+removes the portions already covered, at that pen's own stored width. Longest
+strokes are processed first so the major linework survives.
+
+On a recent dense plot: 52.25 m of ink → 46.47 m, 11% removed, no visible loss.
+
+### Placement
+
+![placement](screenshots/canvas/placement.png)
+
+Four modes: registered paper, bed-centred, direct (use the curves' actual
+position in space), or driven from a graph. FIT scales artwork into the sheet;
+LOCK freezes a placement so edits upstream do not shift it. The paper preview
+stays visible in every mode so curves can be oriented against it.
+
+![layout reserved](screenshots/layout_reserved.png)
+
+### Titleblock
+
+![titleblock](screenshots/canvas/titleblock.png)
+
+A parametric MAGI-style titleblock drawn with a **single-stroke engraving font**
+(`strokefont.py`) — every glyph is drawn once, which is what a pen actually
+wants. It sizes itself to the registered sheet, reserves a strip at the bottom,
+and PLACE fits the artwork into what is left. Contents are live: pen names,
+estimated duration, scale, date. Two dropdowns pick which pens draw it.
+
+![titleblock placed](screenshots/titleblock_placed.png)
+
+### GCODE and the manifest
+
+![gcode](screenshots/canvas/gcode.png)
+
+Sampling, per-pen passes, travel ordering, welding, the signature, the bounding
+box mime, and the manifest. Read the manifest before pressing PLOT — it refuses
+to run if the plot falls outside the paper or the machine.
+
+```
+JOB: 3 pass(es) | est 54.1 min (draw 28.0m, travel 13.4m)
+placement: REGISTERED paper, FIT scale 0.54
+PASS 1 - pen 1 [BLACK FINE]:   459 strokes (3.3m)
+PASS 2 - pen 2 [BLACK BOLD]: 11826 strokes (24.4m)
+PASS 3 - pen 4 [RED FINE]:     102 strokes (0.3m)
+speeds: Normal (draw 3000 / travel 6000 / accel 3000)
+welded 12 touching stroke ends (12 pen lifts saved)
+```
+
+![pen legend](screenshots/canvas/pen_legend.png)
+
+---
+
+## Things that took a while to get right
+
+- **Adaptive bed mesh.** The plot's bounding box is emitted as an
+  `EXCLUDE_OBJECT_DEFINE` polygon before `BED_MESH_CALIBRATE ADAPTIVE=1`, so
+  KAMP probes only the paper — not the whole 350 mm bed.
+- **Conditional homing/QGL.** `PLOT_HOME_QGL` skips both if they have already
+  run, so a pen swap does not re-level.
+- **Welding.** Curves that are separate objects in Rhino but touch end-to-end
+  were causing a pen lift per segment. Ends within `weld` distance are merged
+  into one stroke.
+- **Travel ordering is spatially indexed.** Greedy nearest-end ordering scanned
+  every remaining stroke each step — O(n²). At 11,826 strokes that was ~70
+  million distance tests and **670 seconds** of solve. Endpoints now go into a
+  grid searched ring-by-ring, stopping once the ring's inner edge is further
+  than the best candidate found: **10.7 s**, identical result (travel 24.8 m →
+  11.6 m either way).
+- **Small closed curves plotted as triangles.** `DivideByLength` collapsed them
+  to three points. There is now a segment-count floor for short/closed curves.
+- **The pen offset was measured, not assumed.** A 4-point bed measurement found
+  the real offset was 10 mm off nominal — every plot before that was wrong by
+  10 mm. Re-measure after any toolhead change.
+
+---
 
 ## Files
 
 | File | What |
 |---|---|
-| `plotter.gh` | The Grasshopper definition (canvas UI: sliders, dropdowns, PLOT button) |
-| `plotter_workspace.3dm` | Rhino workspace with the bed model aligned at physical coords |
-| `place_component.py` | PLACE: art -> paper mapping, FIT/1:1, placement LOCK, DIRECT bypass |
-| `gcode_component.py` | GCODE: sampling, per-pen passes, signature, manifest, emission |
-| `preview_component.py` | PREVIEW: thin display shell (plan geometry drawn raw) |
-| `dash_component.py` | DASH processor (curves -> dashed curves), template for processor blocks |
-| `ca_component.py` | CHROMATIC ABERRATION processor (curves -> 6 offset colour steps) |
-| `hatch_component.py` | HATCH fill: parallel lines / concentric insets (Clipper2) |
-| `hilbert_component.py` | HILBERT fill: space-filling curve, one continuous stroke |
-| `flowfield_component.py` | FLOW FIELD fill: evenly-spaced streamlines through a noise field |
-| `serpentine_component.py` | SERPENTINE fill: scanlines snaked together, pen stays down |
-| `truchet_component.py` | TRUCHET fill: random arc/diagonal tiles chained into loops |
-| `stipple_component.py` | STIPPLE / TSP-ART: blue-noise dots (-> DOTS block) + one-line tour |
-| `growth_component.py` | DIFFERENTIAL GROWTH: self-repelling loop folds into coral forms |
-| `contour_component.py` | CONTOUR: noise terrain -> topographic iso-lines |
-| `pressure_component.py` | PRESSURE: writes the Z pressure channel (curvature/proximity/image/noise) |
-| `crop_component.py` | CROP: clips curves to any closed shape(s), even-odd so nested = holes |
-| `paper_registration.json` | Last taught paper corners (also stored on the printer) |
+| `plotter.gh` | The Grasshopper definition (all canvas UI) |
+| `plotter_workspace.3dm` | Rhino workspace, bed model aligned to physical coords |
+| `place_component.py` | PLACE: art → paper mapping, FIT/1:1, LOCK, DIRECT bypass |
+| `gcode_component.py` | GCODE: sampling, passes, ordering, welding, manifest, emission |
+| `preview_component.py` | PREVIEW: display shell (plan geometry drawn raw) |
+| `thinout_component.py` | THINOUT: per-pen culling of unresolvable linework |
+| `titleblock_component.py` | TITLEBLOCK: parametric block, auto-sized to the sheet |
+| `strokefont.py` | Single-stroke engraving font (A–Z 0–9 + punctuation) |
+| `paperreg_component.py` | PAPER REGISTRATION: teach/pull the three corners |
+| `pencal_component.py` | PEN TOOL TABLE: per-pen XYZ datums |
+| `pentrim_component.py` | PEN TRIM: live X/Y/Z nudges mid-plot |
+| `penwidth_component.py` | PEN WIDTHS: line weight per pen |
+| `centre_component.py` | CENTRE: recentre artwork on the sheet |
+| `crop_component.py` | CROP: clip to closed shapes, even-odd |
+| `dash_component.py` | DASH (also the template for new processor blocks) |
+| `vardash_component.py` | VARIABLE DASH: ink/gap by length or attractor |
+| `ca_component.py` | CHROMATIC ABERRATION: 6 offset colour steps |
+| `pressure_component.py` | PRESSURE: writes the Z pressure channel |
+| `hatch_component.py` | HATCH fill: parallel lines / concentric insets |
+| `hilbert_component.py` | HILBERT fill |
+| `flowfield_component.py` | FLOW FIELD fill |
+| `serpentine_component.py` | SERPENTINE fill |
+| `truchet_component.py` | TRUCHET fill |
+| `stipple_component.py` | STIPPLE / TSP-ART |
+| `growth_component.py` | DIFFERENTIAL GROWTH |
+| `contour_component.py` | CONTOUR / iso-lines |
+| `circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
+| `pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
+| `ascii_component.py` | ASCII SHADER: image → shape-matched characters |
+| `pen_widths.json` | Line weight per pen |
+| `paper_registration.json` | Last taught paper corners (also on the printer) |
+| `titleblock_brief.md` | Design brief the titleblock SVG was generated from |
 
-## Printer-side (in this repo's config)
+---
 
-- `pen_macros.cfg`: `PEN_PAUSE` (non-parking pen swap w/ colour prompt),
-  `PEN_RESUME` (no un-retract - NEVER use stock RESUME for pen plots),
-  `PEN_RESTORE_LIMITS`, `PLOT_HOME_QGL` (conditional homing/QGL),
-  `PAPER_SET_FL/FR/BL` (3-corner paper registration teaching, persisted via
-  save_variables).
+## Printer-side macros (`pen_macros.cfg` in this repo's config)
+
+| Macro | What |
+|---|---|
+| `PEN_PAUSE COLOR=` | Pen swap without parking; prompts for the named pen |
+| `PEN_RESUME` | Resume with no un-retract — **never use stock RESUME for pen plots** |
+| `PEN_RESTORE_LIMITS` | Put velocity/accel limits back after a plot |
+| `PLOT_HOME_QGL` | Conditional home + QGL (skips if already done) |
+| `PAPER_SET_FL/FR/BL` | Teach a paper corner, persisted via `save_variables` |
+| `PEN_COLLET` | Move to the pen-fitting position |
+| `PEN_CAL_POS` | Move to the calibration dot (nozzle coords) |
+| `PEN_CALIBRATE` | Store the current position as this pen's datum |
+| `PEN_APPLY PEN=n` | Load pen n's stored offset |
+| `PEN_TABLE` | Print the stored table |
+| `PEN_CLEAR_CAL PEN=n` | Forget pen n |
+
+---
 
 ## Plot workflow
 
-1. Paper down. If it moved: jog pen to 3 corners -> `PAPER_SET_FL/FR/BL`
-   buttons -> `PULL registration` in Grasshopper.
-2. Read the JOB MANIFEST panel (passes, time, warnings - PLOT refuses if out
-   of bounds).
-3. Press PLOT (uploads + starts). Machine homes/QGLs (only if needed), slowly
-   traces the plot bounding box for an alignment check, then presents at the
-   auto load point just off the paper edge.
-4. Seat pen to bed surface, tighten, `PEN_RESUME`. It signs "JC", draws a
-   calibration row (babystep Z window), then plots the pass.
-5. Repeat seat/resume for each pen pass (display names the colour to load).
+1. **Paper down.** If it moved: jog the pen to three corners → `PAPER_SET_FL`,
+   `FR`, `BL` → the paper outline updates live in Rhino.
+2. **Calibrate any uncalibrated pen** (once per pen, not per plot): CAL 1 fit at
+   the collet → CAL 2 go to the cal point → jog the tip onto the dot → CAL 3
+   STORE.
+3. **Read the JOB MANIFEST.** Passes, time, warnings. PLOT refuses if out of
+   bounds.
+4. **Press PLOT.** It uploads and starts. The machine homes/QGLs only if
+   needed, probes just the paper, then traces the plot bounding box slowly as an
+   alignment check before committing ink.
+5. **Seat each pen.** It presents just off the paper edge; seat the pen to the
+   bed surface, tighten, `PEN_RESUME`. Repeat per pass — the display names the
+   pen to load. Pen-change dots always land outside the paper margins.
+6. **End of plot** parks centred in X toward the back, steppers left on, so the
+   paper can be lifted off cleanly.
+
+---
 
 ## History
 
-Built pair-programming with Claude via a Rhino MCP bridge (Keratin) driving
-the Grasshopper canvas programmatically. G-code, macros, registration system,
-multi-pen passes, pressure channel and preview architecture all generated and
-iterated in-session.
+Built pair-programming with Claude over a Rhino MCP bridge (Keratin) driving the
+Grasshopper canvas programmatically — components authored, wired, laid out and
+debugged in-session, alongside the Klipper macros, registration system and
+calibration procedures.

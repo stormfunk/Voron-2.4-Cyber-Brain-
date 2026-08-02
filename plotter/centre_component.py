@@ -12,7 +12,7 @@ import json
 
 REGFILE = r'C:\Users\john.chandler\voron_plotter\paper_registration.json'
 PADNAME = 'ARTWORK position'
-OFFY = -44.5          # pen sits 44.5mm in front of the nozzle (measured 2026-07-17)
+OFFY = -58.0          # new pen toolhead 2026-07-21: pen 58mm in front of nozzle
 BED = 350.0
 
 
@@ -31,7 +31,7 @@ def apply_centre(d):
         _p1 = _reg['p1']
         _p2 = _reg['p2']
         _cx = _p0[0] + ((_p1[0] - _p0[0]) + (_p2[0] - _p0[0])) / 2.0
-        _cy = _p0[1] + ((_p1[1] - _p0[1]) + (_p2[1] - _p0[1])) / 2.0 - 44.5
+        _cy = _p0[1] + ((_p1[1] - _p0[1]) + (_p2[1] - _p0[1])) / 2.0 - 58.0
     except:
         pass
     for _o in d.Objects:

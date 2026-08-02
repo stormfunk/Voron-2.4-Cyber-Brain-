@@ -76,15 +76,18 @@ if ritual is None:
 QGL = 'qgl' in RIT
 MESH = 'mesh' in RIT
 PENLOAD = 'penload' in RIT
+# apply each pen's stored tool-table datum at its swap (PEN_APPLY)
+PENTABLE = 'pentable' in RIT
 WRITE = False if write is None else bool(write)
 PLOT = False if plot is None else bool(plot)
 OFFX = 0.0      # pen tip offset from nozzle (hardware constant, matches PLACE)
-OFFY = -44.5    # measured 2026-07-17 by 4-point bed calibration (was -54.5)
+OFFY = -58.0    # new pen toolhead 2026-07-21: pen 58mm in front of nozzle (was -44.5)
 DWELL = float(dot_dwell) if dot_dwell is not None else 50.0
 if DWELL < 0.0: DWELL = 0.0
 DPEN = int(dots_pen) if dots_pen is not None else 2
 # THE PERMANENT PEN PALETTE (order = pass/draw order)
-PEN_NAMES = {1: 'BLACK', 2: 'RED', 3: 'GREEN', 4: 'BLUE', 5: 'YELLOW', 6: 'ORANGE', 7: 'AQUA', 8: 'PINK'}
+PEN_NAMES = {1: 'BLACK FINE', 2: 'BLACK BOLD', 3: 'BLACK ROLLER', 4: 'RED FINE',
+             5: 'CUSTOM 1', 6: 'CUSTOM 2', 7: 'CUSTOM 3', 8: 'CUSTOM 4'}
 def penname(n):
     return PEN_NAMES.get(n, 'PEN%d' % n)
 
@@ -125,7 +128,22 @@ def sample(crv):
     c = crv if isinstance(crv, rg.Curve) else rs.coercecurve(crv)
     if c is None:
         return pts
-    ts = c.DivideByLength(RES, True)
+    # A small CLOSED shape (a plotted dot, a tiny circle) must not collapse into
+    # a triangle just because its perimeter is near the sampling resolution -
+    # give closed curves a floor on segment count regardless of RES.
+    _L = c.GetLength()
+    _n = int(_L / RES) if RES > 0.0001 else 1
+    if c.IsClosed and _n < 12:
+        _n = 12
+    elif _n < 12 and _L < 30.0:
+        # short OPEN curve: only give it the floor if it is genuinely curved
+        # (a spiral-filled dot), never a straight dash - compare arc to chord
+        _ch = c.PointAtStart.DistanceTo(c.PointAtEnd)
+        if _L > _ch * 1.15:
+            _n = 12
+    if _n < 1:
+        _n = 1
+    ts = c.DivideByCount(_n, True)
     if ts:
         for t in ts:
             pts.append(c.PointAt(t))
@@ -208,14 +226,41 @@ if dpts and DPEN not in _pset:
 passes = sorted(_pset)
 
 # ---- calibration signature ----
+# Clamp corrections, filled in once the signature's local extent is known so the
+# whole block can be nudged back onto the sheet rigidly (see below).
+_SIG_CU = 0.0
+_SIG_CV = 0.0
+
+
+def _sigbase():
+    """anchor for the signature, in PAPER-LOCAL (u,v) mm. Both anchor modes work
+    in the paper's frame so the signature rotates with a skewed sheet exactly
+    like the artwork does."""
+    _p0 = fr["p0"]; _eu = fr["eu"]; _ev = fr["ev"]; _rm = fr.get("regm", 10.0)
+    if SIGART and xs:
+        # artwork bounds corner, measured along the PAPER's axes
+        _mu = None; _mv = None
+        for _i in range(len(xs)):
+            _dx = xs[_i] - _p0[0]; _dy = ys[_i] - _p0[1]
+            _pu = _dx*_eu[0] + _dy*_eu[1]
+            _pv = _dx*_ev[0] + _dy*_ev[1]
+            if _mu is None or _pu < _mu: _mu = _pu
+            if _mv is None or _pv < _mv: _mv = _pv
+        _bv = _mv - 13.0
+        if _bv < 1.0: _bv = 1.0
+        return (_mu + SIGX, _bv + SIGY)
+    return (_rm + SIGX, 1.0 + SIGY)
+
+
 def _sigmap_local(lu, lv):
-    if fr.get("mode") == "reg" and not SIGART:
-        # anchored to the paper corner, in the paper's own (possibly rotated) frame
-        _p0 = fr["p0"]; _eu = fr["eu"]; _ev = fr["ev"]; _rm = fr.get("regm", 10.0)
-        _u = _rm + SIGX + lu; _v = 1.0 + SIGY + lv
+    if fr.get("mode") == "reg":
+        _p0 = fr["p0"]; _eu = fr["eu"]; _ev = fr["ev"]
+        _b = _sigbase()
+        _u = _b[0] + _SIG_CU + lu
+        _v = _b[1] + _SIG_CV + lv
         return (_p0[0] + _eu[0]*_u + _ev[0]*_v, _p0[1] + _eu[1]*_u + _ev[1]*_v)
     else:
-        # anchored to the artwork bounds corner (axis-aligned), below the art
+        # no paper frame (direct / bed-centred / graph): axis-aligned under the art
         _bx = (min(xs) if xs else 30.0)
         _by = ((min(ys) - 13.0) if ys else 30.0)
         if _by < 2.0: _by = 2.0
@@ -247,10 +292,42 @@ if CALSIG and passes:
             _t = math.radians(35.0 + 290.0*s/24.0)
             _arc.append((_ccx + _r*math.cos(_t), _ccy + _r*math.sin(_t)))
         _sig_local.append(_arc)
-    for _st in _sig_local:
-        cal_sig_polys.append([_sigmap_local(q[0], q[1]) for q in _st])
     _circ_u0 = _ccx + 4.5 + 4.0
     _rowlen = CAL_N*CAL_GAP + 6.0
+    # ---- local extent of the WHOLE block (glyph + every calibration row) ----
+    _lu0 = None; _lu1 = None; _lv0 = None; _lv1 = None
+    _probe = []
+    for _st in _sig_local:
+        for q in _st: _probe.append(q)
+    for k in range(len(passes)):
+        for kk in range(CAL_N):
+            _cu = _circ_u0 + k*_rowlen + CAL_R + kk*CAL_GAP
+            _probe.append((_cu - CAL_R, 4.0 - CAL_R))
+            _probe.append((_cu + CAL_R, 4.0 + CAL_R))
+    for q in _probe:
+        if _lu0 is None or q[0] < _lu0: _lu0 = q[0]
+        if _lu1 is None or q[0] > _lu1: _lu1 = q[0]
+        if _lv0 is None or q[1] < _lv0: _lv0 = q[1]
+        if _lv1 is None or q[1] > _lv1: _lv1 = q[1]
+    # ---- keep it ON the sheet: the offsets that suit one anchor mode can push
+    # the block off the paper in the other, so nudge the whole thing back inside
+    # (rigid shift - the signature never distorts). ----
+    if fr.get("mode") == "reg" and _lu0 is not None:
+        _bu, _bv = _sigbase()
+        _wu = fr.get("wu", 0.0); _hv = fr.get("hv", 0.0)
+        _m = 2.0
+        if _bu + _lu0 < _m:
+            _SIG_CU = _m - (_bu + _lu0)
+        elif _wu > 0 and _bu + _lu1 > _wu - _m:
+            _SIG_CU = (_wu - _m) - (_bu + _lu1)
+            if _bu + _lu0 + _SIG_CU < _m: _SIG_CU = _m - (_bu + _lu0)
+        if _bv + _lv0 < _m:
+            _SIG_CV = _m - (_bv + _lv0)
+        elif _hv > 0 and _bv + _lv1 > _hv - _m:
+            _SIG_CV = (_hv - _m) - (_bv + _lv1)
+            if _bv + _lv0 + _SIG_CV < _m: _SIG_CV = _m - (_bv + _lv0)
+    for _st in _sig_local:
+        cal_sig_polys.append([_sigmap_local(q[0], q[1]) for q in _st])
     for k in range(len(passes)):
         _marks = []
         for kk in range(CAL_N):
@@ -274,6 +351,11 @@ if CALSIG and passes:
             break
 
 # ---- per-pass greedy ordering ----
+# weld tolerance: strokes whose ends meet within this are drawn as one
+WELD = float(weld) if weld is not None else 0.1
+if WELD < 0.0:
+    WELD = 0.0
+n_welds = 0
 pass_strokes = {}
 for k in range(len(passes)):
     pn = passes[k]
@@ -285,23 +367,90 @@ for k in range(len(passes)):
         cx = cal_rows[k][0][1][0]; cy = cal_rows[k][0][1][1]
     else:
         cx = LX; cy = LY      # load point, pen space
-    rem = list(mine)
+    # ---- greedy nearest-end ordering, spatially indexed ----
+    # Scanning every remaining stroke each step is O(n^2): at ~12k strokes that
+    # is ~70M distance tests and minutes of solve. Bucket both endpoints into a
+    # grid and search outward ring by ring instead, stopping once the next ring
+    # cannot beat what we already have.
     ordered = []
-    while rem:
-        bi = 0; brev = False; bd = None
-        for i in range(len(rem)):
-            q0 = rem[i][0]; q1 = rem[i][-1]
-            d0 = (q0.X-cx)*(q0.X-cx) + (q0.Y-cy)*(q0.Y-cy)
-            d1 = (q1.X-cx)*(q1.X-cx) + (q1.Y-cy)*(q1.Y-cy)
-            if bd is None or d0 < bd:
-                bd = d0; bi = i; brev = False
-            if d1 < bd:
-                bd = d1; bi = i; brev = True
-        pl = rem.pop(bi)
-        if brev:
-            pl = list(reversed(pl))
-        ordered.append(pl)
-        cx = pl[-1].X; cy = pl[-1].Y
+    nrem = len(mine)
+    if nrem:
+        _ex = []; _ey = []
+        for pl in mine:
+            _ex.append(pl[0].X); _ex.append(pl[-1].X)
+            _ey.append(pl[0].Y); _ey.append(pl[-1].Y)
+        _gx0 = min(_ex); _gy0 = min(_ey)
+        _w = max(_ex) - _gx0; _h = max(_ey) - _gy0
+        _cell = math.sqrt(max(_w * _h, 1.0) / max(nrem, 1)) * 2.0
+        if _cell < 1.0:
+            _cell = 1.0
+        _buckets = {}
+        for i in range(nrem):
+            for _e in (0, 1):
+                _p = mine[i][0] if _e == 0 else mine[i][-1]
+                _k = (int((_p.X - _gx0) / _cell), int((_p.Y - _gy0) / _cell))
+                if _k not in _buckets:
+                    _buckets[_k] = []
+                _buckets[_k].append((i, _e))
+        _used = [False] * nrem
+        _left = nrem
+        while _left > 0:
+            _ci = int((cx - _gx0) / _cell); _cj = int((cy - _gy0) / _cell)
+            bi = -1; brev = False; bd = None
+            _ring = 0
+            while True:
+                _found_any = False
+                for _dj in range(-_ring, _ring + 1):
+                    for _di in range(-_ring, _ring + 1):
+                        # only the shell of this ring
+                        if _ring > 0 and abs(_di) != _ring and abs(_dj) != _ring:
+                            continue
+                        _k = (_ci + _di, _cj + _dj)
+                        if _k not in _buckets:
+                            continue
+                        for (i, _e) in _buckets[_k]:
+                            if _used[i]:
+                                continue
+                            _found_any = True
+                            _p = mine[i][0] if _e == 0 else mine[i][-1]
+                            _d = (_p.X - cx) ** 2 + (_p.Y - cy) ** 2
+                            if bd is None or _d < bd:
+                                bd = _d; bi = i; brev = (_e == 1)
+                # a stroke one ring further out can still be closer than the
+                # corner of this ring, so only stop when the ring's inner edge
+                # is already beyond the best distance found
+                if bd is not None and (_ring * _cell) ** 2 > bd:
+                    break
+                _ring += 1
+                if _ring > 4000:
+                    break
+            if bi < 0:
+                break
+            _used[bi] = True
+            _left -= 1
+            pl = mine[bi]
+            if brev:
+                pl = list(reversed(pl))
+            ordered.append(pl)
+            cx = pl[-1].X; cy = pl[-1].Y
+    # ---- weld: a stroke that starts where the previous one ended is the SAME
+    # line as far as the pen is concerned. Separate (unjoined) curves in Rhino
+    # would otherwise lift, travel 0mm and drop again at every joint - wasted
+    # time and an ink blob per corner. Greedy ordering already puts coincident
+    # strokes back to back, so a single sweep catches them.
+    if WELD > 0.0:
+        _merged = []
+        for pl in ordered:
+            if _merged:
+                _pv = _merged[-1]
+                _dx = pl[0].X - _pv[-1].X; _dy = pl[0].Y - _pv[-1].Y
+                if _dx*_dx + _dy*_dy <= WELD*WELD:
+                    for _q in pl[1:]:
+                        _pv.append(_q)      # drop the duplicated joint point
+                    n_welds += 1
+                    continue
+            _merged.append(list(pl))
+        ordered = _merged
     mydots = []
     if dpts and passes[k] == DPEN:
         _remd = list(dpts)
@@ -435,6 +584,11 @@ for k in range(len(passes)):
     L.append('; ======== PASS %d of %d : PEN %d [%s] ========' % (k+1, len(passes), pn, penname(pn)))
     if k > 0 or PENLOAD:
         L.append('PEN_PAUSE Z=%.3f X=%.1f Y=%.1f PEN=%d COLOR=%s   ; load pen %d [%s], seat to bed, PEN_RESUME' % (PDZ, LX - OFFX, LY - OFFY, pn, penname(pn), pn, penname(pn)))
+    if PENTABLE:
+        # this pen's stored XYZ datum (see the PEN TOOL TABLE macros). Runs
+        # AFTER the swap pause so the freshly-fitted pen is aligned before it
+        # draws; a pen with no calibration simply zeroes the offsets.
+        L.append('PEN_APPLY PEN=%d   ; tool-table offsets for pen %d' % (pn, pn))
         L.append('G1 Z%.3f F1200' % (PUZ + 10.0))
         L.append('M400')
     L.append('G1 Z%.3f F%d' % (PUZ, TF))
@@ -581,6 +735,8 @@ for k in range(len(passes)):
             _dd += pl[i-1].DistanceTo(pl[i])
     _man.append('PASS %d - pen %d [%s]: %d strokes (%.1fm)%s' % (k+1, passes[k], penname(passes[k]), len(ordered), _dd/1000.0, (', %d dots' % len(mydots)) if mydots else ''))
 _man.append('speeds: %s (draw %d / travel %d / accel %d)' % (PROF_NAME, DF, TF, AC))
+if n_welds:
+    _man.append('welded %d touching stroke ends (%d pen lifts saved)' % (n_welds, n_welds))
 if WEAR > 0.0001:
     _mx = 0.0
     for k in range(len(passes)):
@@ -591,6 +747,8 @@ if WEAR > 0.0001:
         if _dd2 > _mx: _mx = _dd2
     _man.append('tip wear comp: %.2f mm/m -> Z drops up to %.3f mm by pass end (reset each pen)' % (WEAR, WEAR*_mx/1000.0))
 _man.append('signature: %s' % ('ON (JC + %d cal rows)' % len(cal_rows) if cal_rows else 'off'))
+if cal_rows and (abs(_SIG_CU) > 0.001 or abs(_SIG_CV) > 0.001):
+    _man.append('  (signature nudged %+.1f,%+.1f mm to stay on the sheet)' % (_SIG_CU, _SIG_CV))
 if MESH and xs:
     _man.append('mesh: adaptive over plot area only (pen offset included)')
 if OUTLINE and xs:

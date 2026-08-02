@@ -25,7 +25,7 @@ except:
 
 BED = 350.0
 OFFX = 0.0      # pen tip offset from nozzle (hardware constant)
-OFFY = -44.5    # measured 2026-07-17 by 4-point bed calibration (was -54.5)
+OFFY = -58.0    # new pen toolhead 2026-07-21: pen 58mm in front of nozzle (was -44.5)
 REGFILE = r'C:\Users\john.chandler\voron_plotter\paper_registration.json'
 LOCKFILE = r'C:\Users\john.chandler\voron_plotter\placement_lock.json'
 # pmode: 0 = registered paper, 1 = bed centered, 2 = direct (Rhino coords),
@@ -56,6 +56,13 @@ LOCK = False if lock is None else bool(lock)
 SCALE = float(scale) if scale is not None else 1.0
 if SCALE < 0.001:
     SCALE = 0.001
+# Space kept clear along the BOTTOM of the sheet (mm) - wire this from the
+# titleblock height and the artwork fits, and centres, in what is left above
+# it. A small gap is added so the art never touches the block.
+RESERVE = float(reserve_bottom) if reserve_bottom is not None else 0.0
+if RESERVE < 0.0:
+    RESERVE = 0.0
+RES_GAP = 4.0 if RESERVE > 0.01 else 0.0
 
 def _coerce_curves(lst, plist):
     cs = []; cp = []
@@ -162,7 +169,10 @@ elif reg and xs:
     eux = ux/wu; euy = uy/wu
     evx = vx/hv; evy = vy/hv
     aw = max(xs)-min(xs); ah = max(ys)-min(ys)
-    uw = wu - 2.0*REGM; vh = hv - 2.0*REGM
+    uw = wu - 2.0*REGM
+    vh = hv - 2.0*REGM - RESERVE - RES_GAP     # titleblock strip kept clear
+    if vh < 1.0:
+        vh = hv - 2.0*REGM
     s_ = 1.0
     if FIT and aw > 0.001 and ah > 0.001:
         s_ = min(uw/aw, vh/ah)
@@ -172,7 +182,7 @@ elif reg and xs:
     if aw*s_ > uw + 0.01 or ah*s_ > vh + 0.01:
         fr["pwarn"] = 1
     offu = REGM + (uw - aw*s_)/2.0
-    offv = REGM + (vh - ah*s_)/2.0
+    offv = REGM + RESERVE + RES_GAP + (vh - ah*s_)/2.0
     mnx = min(xs); mny = min(ys)
     # composed transform (struct field assignment on rg.Transform is unreliable
     # in IronPython): scale about origin -> offset in paper-local -> paper plane
