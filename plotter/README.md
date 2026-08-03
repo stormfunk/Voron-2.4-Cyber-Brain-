@@ -57,6 +57,15 @@ through chromatic aberration onto separate pens, crop it to a shape.
 
 ## Canvas tour
 
+The whole definition, left to right: hardware setup and pen calibration, then
+generators, then processors and region fills, then assembly (layer table,
+titleblock, placement), then G-code emission, then the preview and pen legend.
+
+![canvas overview](screenshots/canvas/overview.png)
+
+Every group is captured below at full resolution, rendered straight off the
+canvas rather than screengrabbed.
+
 ### Paper registration — teaching the machine where the sheet is
 
 ![paper registration](screenshots/canvas/paper_registration.png)
@@ -95,6 +104,14 @@ Pen 1 is the exception, and deliberately so. It *is* the datum every other pen
 is measured against, so a trim on pen 1 cannot be folded into the table — it
 would only re-zero itself. A pen 1 height error is a global draw-height error:
 change `pen_down_z` instead, or re-run STORE at the cal dot to move the datum.
+
+### Pen control — pausing between passes
+
+![pen control](screenshots/canvas/pen_control.png)
+
+`PEN_PAUSE` holds for a pen swap and `PEN_RESUME` continues without un-retracting
+— never use Klipper's stock RESUME for a pen plot, it will un-retract into the
+paper. `PEN_COLLET` sends the head to the pen-fitting position.
 
 ### Pen trim — live nudges mid-plot
 
@@ -255,6 +272,15 @@ PASS 3 - pen 4 [RED FINE]:     102 strokes (0.3m)
 speeds: Normal (draw 3000 / travel 6000 / accel 3000)
 welded 12 touching stroke ends (12 pen lifts saved)
 ```
+
+### Preview and pen legend
+
+![preview](screenshots/canvas/preview.png)
+
+PREVIEW draws the emission plan itself rather than the upstream geometry, so
+what you see is what the machine will do. The legend assigns each pen its
+viewport colour and — via the Custom Preview Lineweights — its real width, so
+a 0.8 mm roller looks like a 0.8 mm roller on screen.
 
 ![pen legend](screenshots/canvas/pen_legend.png)
 
