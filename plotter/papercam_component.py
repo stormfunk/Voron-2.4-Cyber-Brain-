@@ -97,6 +97,45 @@ def homography(src, dst):
     return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1.0]
 
 
+def homography_n(src, dst):
+    """least-squares homography from N>=4 correspondences.
+
+    Four points give an exact fit, which means it fits any error in those four
+    perfectly and tells you nothing. With more marks the system is
+    over-determined, so the residual per mark becomes a real measurement - of
+    lens distortion, of a mark drawn slightly off, of the camera having shifted.
+    Solved through the normal equations (A^T A x = A^T b) on the same 8-unknown
+    DLT rows."""
+    n = len(src)
+    if n < 4 or len(dst) < n:
+        return None
+    if n == 4:
+        return homography(src, dst)
+    ATA = []
+    for i in range(8):
+        ATA.append([0.0] * 8)
+    ATb = [0.0] * 8
+    for i in range(n):
+        x, y = src[i]
+        u, v = dst[i]
+        rows = ([x, y, 1.0, 0.0, 0.0, 0.0, -u * x, -u * y],
+                [0.0, 0.0, 0.0, x, y, 1.0, -v * x, -v * y])
+        rhs = (u, v)
+        for r in range(2):
+            row = rows[r]
+            for a in range(8):
+                if row[a] == 0.0:
+                    continue
+                ATb[a] += row[a] * rhs[r]
+                for b2 in range(8):
+                    if row[b2] != 0.0:
+                        ATA[a][b2] += row[a] * row[b2]
+    h = solve8(ATA, ATb)
+    if h is None:
+        return None
+    return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1.0]
+
+
 def apply_h(H, x, y):
     d = H[6] * x + H[7] * y + H[8]
     if abs(d) < 1e-12:
@@ -234,6 +273,72 @@ def quad_from_hull(hull):
     return bq, best
 
 
+def blobs(gr, w, h, t, amin, amax):
+    """dark connected regions whose area falls in a band.
+
+    The bed is dark too, so a plain dark threshold catches everything - but the
+    bed comes out as one enormous component and a drawn mark as a small round
+    one, so filtering on area is what separates them. It also means this works
+    whether the marks are on one big sheet or on separate scraps of tape."""
+    seen = [False] * (w * h)
+    out = []
+    for sy in range(h):
+        base = sy * w
+        for sx in range(w):
+            i = base + sx
+            if seen[i] or gr[i] > t:
+                continue
+            stack = [i]
+            seen[i] = True
+            cells = []
+            over = False
+            while stack:
+                p = stack.pop()
+                cells.append(p)
+                if len(cells) > amax:
+                    over = True
+                    break
+                py = p // w
+                px = p - py * w
+                if px > 0:
+                    q = p - 1
+                    if not seen[q] and gr[q] <= t:
+                        seen[q] = True; stack.append(q)
+                if px < w - 1:
+                    q = p + 1
+                    if not seen[q] and gr[q] <= t:
+                        seen[q] = True; stack.append(q)
+                if py > 0:
+                    q = p - w
+                    if not seen[q] and gr[q] <= t:
+                        seen[q] = True; stack.append(q)
+                if py < h - 1:
+                    q = p + w
+                    if not seen[q] and gr[q] <= t:
+                        seen[q] = True; stack.append(q)
+            if over or len(cells) < amin:
+                continue
+            n = len(cells)
+            x0 = w; x1 = -1; y0 = h; y1 = -1
+            sxs = 0.0; sys = 0.0
+            for p in cells:
+                py = p // w
+                px = p - py * w
+                sxs += px; sys += py
+                if px < x0: x0 = px
+                if px > x1: x1 = px
+                if py < y0: y0 = py
+                if py > y1: y1 = py
+            bw = x1 - x0 + 1.0
+            bh = y1 - y0 + 1.0
+            if n / (bw * bh) < 0.45:        # a filled disc covers ~0.79 of its box
+                continue
+            if bw / bh > 3.0 or bh / bw > 3.0:
+                continue
+            out.append((sxs / n, sys / n, n, x0, y0, x1, y1))
+    return out
+
+
 def lock_rgb(bm):
     """full-resolution pixels, kept as a raw buffer - building a 900k-entry
     Python list just to sample a few hundred points would cost more than the
@@ -346,7 +451,11 @@ def refine_quad(buf, stride, w, h, quad, t):
     return out
 
 
-URL = str(url) if url else 'http://192.168.1.23:8080/?action=snapshot'
+# crowsnest's own port (8080) is NOT reachable from outside the pi - only the
+# nginx proxy path is. Verified: :8080 refuses the connection, /webcam/ answers.
+#   overhead cam -> /webcam/    (cam bedcam,  USB port 1.1)
+#   low side cam -> /webcam2/   (cam lifecam, USB port 1.2)
+URL = str(url) if url else 'http://192.168.1.23/webcam/?action=snapshot'
 HOST = 'http://192.168.1.23:7125'
 PARK = True if park is None else bool(park)
 PARKCMD = str(park_cmd) if park_cmd else 'PLOT_CAM_PARK'
@@ -354,6 +463,45 @@ THRESH = int(thresh) if thresh is not None else -1
 MINA = float(min_area) if min_area is not None else 0.02
 DEBUG = True if debug is None else bool(debug)
 ON = True if on is None else bool(on)
+
+# ---- calibration target ----
+# Marks are DRAWN rather than stuck on and measured: the machine already knows
+# exactly where it put the pen, so their coordinates are exact by construction,
+# and the calibration ends up mapping the camera to MACHINE coordinates - where
+# the toolhead actually goes - rather than to the bed as an object.
+# The pen sits 58mm in front of the nozzle, so it can only reach Y 0..292.
+BEDX = 350.0
+PENY = 292.0
+GRIDN = int(grid_n) if grid_n is not None else 3
+if GRIDN < 2: GRIDN = 2
+if GRIDN > 5: GRIDN = 5
+INSET = float(inset) if inset is not None else 45.0
+MARKD = float(mark_d) if mark_d is not None else 9.0
+if MARKD < 3.0: MARKD = 3.0
+_gx = []
+_gy = []
+for i in range(GRIDN):
+    f = float(i) / (GRIDN - 1)
+    _gx.append(INSET + (BEDX - 2.0 * INSET) * f)
+    _gy.append(INSET + (PENY - 2.0 * INSET) * f)
+GRID = []
+for yy in _gy:
+    for xx in _gx:
+        GRID.append((xx, yy))
+
+target_crvs = []
+_pw = 0.4
+for (mx, my) in GRID:
+    r = MARKD * 0.5
+    turns = int(r / _pw) + 1
+    steps = int(2.0 * math.pi * r / (_pw * 0.9)) + 8
+    lp = List[rg.Point3d]()
+    for i in range(steps + 1):
+        tt = float(i) / steps
+        rr = r * (1.0 - tt)
+        a = 2.0 * math.pi * turns * tt
+        lp.Add(rg.Point3d(mx + rr * math.cos(a), my + rr * math.sin(a), 0))
+    target_crvs.append(rg.PolylineCurve(lp))
 
 corners = []
 info = ''
@@ -373,32 +521,80 @@ else:
     # ---- calibrate ----
     if calibrate:
         did = True
-        ip = []; bp = []
-        try:
-            for q in (calib_img or []):
-                ip.append((float(q.X), float(q.Y)))
-            for q in (calib_bed or []):
-                bp.append((float(q.X), float(q.Y)))
-        except:
-            pass
-        if len(ip) < 4 or len(bp) < 4:
-            info = 'calibration needs 4 image points and 4 bed points (got %d and %d)' % (len(ip), len(bp))
+        parked = ''
+        if PARK:
+            parked = 'parked | ' if send_gcode(HOST, PARKCMD) else 'PARK FAILED | '
+        bm = grab(URL)
+        if bm is None:
+            info = 'no frame from %s' % URL
         else:
-            Hn = homography(ip[:4], bp[:4])
-            if Hn is None:
-                info = 'calibration failed - the 4 image points must not be collinear'
+            gr, gw, gh_, scl = gray_of(bm, 640)
+            t = otsu(gr) if THRESH < 0 else THRESH
+            # marks are DARK on a light sheet - the inverse of finding the sheet
+            # itself, which is light on a dark bed
+            amin = 8
+            amax = int(gw * gh_ * 0.02)
+            found = blobs(gr, gw, gh_, t, amin, amax)
+            if len(found) < 4:
+                info = ('%sfound only %d mark(s) - need at least 4. '
+                        'threshold %d, %d blobs in band. Is the target drawn and the sheet lit?') % (
+                    parked, len(found), t, len(found))
             else:
-                # residual on the points themselves, as a sanity number
-                err = 0.0
-                for i in range(4):
-                    m = apply_h(Hn, ip[i][0], ip[i][1])
-                    err += math.sqrt((m[0]-bp[i][0])**2 + (m[1]-bp[i][1])**2)
-                err /= 4.0
-                _fh = open(CALFILE, 'w')
-                _fh.write(json.dumps({'H': Hn, 'note': 'image px -> bed mm'}))
-                _fh.close()
-                H = Hn
-                info = 'CALIBRATED - mean residual %.3f mm on the 4 reference points' % err
+                pts = [(q[0] * scl, q[1] * scl) for q in found]
+                # correspondence without a homography yet: the four extreme
+                # detections must be the four grid corners, whatever the
+                # rotation or flip, so they give a rough map to predict the rest
+                ext = [None, None, None, None]
+                bestv = [None, None, None, None]
+                for (px, py) in pts:
+                    for k, v in ((0, px + py), (1, -(px + py)), (2, px - py), (3, -(px - py))):
+                        if bestv[k] is None or v > bestv[k]:
+                            bestv[k] = v; ext[k] = (px, py)
+                gminx = min(_gx); gmaxx = max(_gx)
+                gminy = min(_gy); gmaxy = max(_gy)
+                gc = [(gminx, gminy), (gmaxx, gmaxy), (gmaxx, gminy), (gminx, gmaxy)]
+                rough = homography(ext, gc)
+                if rough is None:
+                    info = '%scould not fit a rough map to the outermost marks' % parked
+                else:
+                    src = []; dst = []; used = []
+                    for (gxp, gyp) in GRID:
+                        bi = -1; bd = None
+                        for i in range(len(pts)):
+                            if i in used:
+                                continue
+                            m = apply_h(rough, pts[i][0], pts[i][1])
+                            if m is None:
+                                continue
+                            d = math.sqrt((m[0] - gxp) ** 2 + (m[1] - gyp) ** 2)
+                            if bd is None or d < bd:
+                                bd = d; bi = i
+                        if bi >= 0 and bd is not None and bd < 40.0:
+                            used.append(bi)
+                            src.append(pts[bi]); dst.append((gxp, gyp))
+                    if len(src) < 4:
+                        info = '%smatched only %d mark(s) to the grid' % (parked, len(src))
+                    else:
+                        Hn = homography_n(src, dst)
+                        if Hn is None:
+                            info = '%ssolve failed - marks may be collinear' % parked
+                        else:
+                            res = []
+                            for i in range(len(src)):
+                                m = apply_h(Hn, src[i][0], src[i][1])
+                                res.append(math.sqrt((m[0]-dst[i][0])**2 + (m[1]-dst[i][1])**2))
+                            res_s = sorted(res)
+                            _fh = open(CALFILE, 'w')
+                            _fh.write(json.dumps({'H': Hn, 'marks': len(src),
+                                                  'worst_mm': res_s[-1],
+                                                  'note': 'image px -> bed mm'}))
+                            _fh.close()
+                            H = Hn
+                            info = ('%sCALIBRATED on %d of %d marks | residual mean %.3f mm, '
+                                    'worst %.3f mm | threshold %d, %d blobs seen') % (
+                                parked, len(src), len(GRID),
+                                sum(res) / len(res), res_s[-1], t, len(found))
+            bm.Dispose()
 
     # ---- capture + detect ----
     if capture and not did:

@@ -95,10 +95,32 @@ scale into one 3×3 matrix. That is what lets a single calibration keep working:
 crowsnest has autofocus off (`focus_absolute=2`), so the geometry doesn't drift
 between sessions.
 
-**Calibrate once:** give four points you can see in the frame whose bed
-coordinates you know — `calib_img` in pixels, `calib_bed` in mm — and press
-CALIBRATE. The matrix is solved by DLT and stored in `camera_calibration.json`,
-with the residual on those four points reported as a sanity check.
+**Calibrate once, from marks the plotter draws itself.** `target_crvs` emits a
+grid of filled discs at known machine coordinates; plot them in DIRECT placement
+so they land exactly where commanded, then press CALIBRATE and it finds them and
+solves.
+
+Drawing the marks rather than sticking them on and measuring them is the whole
+point: the machine already knows precisely where it put the pen, so the
+coordinates are exact by construction, and the result maps the camera to
+**machine coordinates** — where the toolhead actually goes — rather than to the
+bed as an object. It has to be drawn marks rather than the pen tip itself,
+because from overhead the toolhead hides its own tip.
+
+With more than four marks the fit is over-determined, so the **residual per mark
+becomes a real measurement** — of lens distortion, of the camera having shifted,
+of a mark drawn badly — instead of the meaningless zero that four points always
+produce. On a synthetic frame through a keystoned, 180°-flipped camera: 9/9
+marks matched, residual mean 0.064 mm, worst 0.128 mm.
+
+The marks are placed within X 0–350 and **Y 0–292**, because the pen sits 58 mm
+in front of the nozzle and cannot reach the back strip.
+
+**A flipped camera needs no correction.** A homography is projective, so it
+absorbs 180° rotation (and any other) completely — the correspondence step finds
+the grid corners regardless of orientation. Rotating in software is purely for
+your own comfort in Mainsail, and if you want it, do it *before* calibrating:
+any change to the camera invalidates a stored matrix.
 
 **Then per sheet:** CAPTURE grabs a frame, picks a threshold by Otsu (paper is
 far brighter than the bed), takes the convex hull of the bright region and
