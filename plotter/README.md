@@ -250,6 +250,42 @@ silently drawing nothing.
 
 ![ascii compare](screenshots/ascii_compare.png)
 
+### Colour separation — one halftone pass per pen
+
+![colour separation](screenshots/canvas/separation.png)
+
+Each pen lays a translucent film of its own ink, so on white paper the mixing is
+**subtractive**: a pen doesn't add its colour, it removes the rest. The
+separation therefore works in absorption space (`absorb = 1 − colour`), where
+inks laid on the same spot add together, and asks how much of each pen
+reproduces the pixel:
+
+> minimise ‖ Σᵢ xᵢ·absorbᵢ − absorb_target ‖² , with 0 ≤ xᵢ ≤ 1
+
+solved per cell by coordinate descent. Each pen's coverage is then drawn as a
+halftone dot whose **area** tracks coverage, on a grid rotated to that pen's own
+screen angle — rotating the screens apart is what stops the passes forming moiré,
+the same reason process printing uses 15°/75°/0°/45°.
+
+The inks are whatever pens you actually own: the pen legend's colour swatches
+wire straight into `inks`, so a black/red/amber set separates as black/red/amber
+rather than pretending to be CMYK.
+
+![separation proof](screenshots/separation_proof.png)
+
+Two things worth knowing. **Convergence matters more than it looks**: a near-black
+ink correlates with every other ink, so a few sweeps leave black over-assigned —
+pure red came out 23% black. Solving properly fixes it, but only if the inks stay
+in their given order. Sorting pale inks first also fixes red, and then builds
+black out of red + green instead of reaching for the black pen — more ink,
+muddier result. The solve is cached per quantised colour, which is what makes a
+converged solve affordable.
+
+**It is ink-hungry.** A 160 × 120 mm image at a 2.2 mm screen came to 10,198
+strokes and 65 m of line across three passes. `cell`, `gamma` and `max_ink` are
+the levers — `max_ink` caps total coverage per cell so the paper doesn't
+saturate.
+
 11,688 strokes over a 161×81 cell grid at 2 mm pitch, rendered at the real
 0.3 mm pen width so the weight is what will land on paper. The silhouette
 resolves in `o`, the sun disc behind it in `^`, and the background falls away
@@ -408,6 +444,7 @@ a 0.8 mm roller looks like a 0.8 mm roller on screen.
 | `pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
 | `ascii_component.py` | ASCII SHADER: image → shape-matched characters |
 | `svg_component.py` | SVG IMPORT: any `.svg` → pen-assigned curves |
+| `separation_component.py` | COLOUR SEPARATION: image → one halftone pass per pen |
 | `pen_commit_macros.cfg` | `PEN_COMMIT` / `PEN_TWEAK` — append to the printer's `pen_macros.cfg` |
 | `pen_widths.json` | Line weight per pen |
 | `paper_registration.json` | Last taught paper corners (also on the printer) |
