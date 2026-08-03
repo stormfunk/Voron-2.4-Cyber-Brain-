@@ -119,6 +119,18 @@ def grab(url):
         return None
 
 
+def send_gcode(host, cmd):
+    """fire a command at Moonraker and wait for the motion to finish"""
+    try:
+        import urllib
+        import urllib2
+        u = host + '/printer/gcode/script?script=' + urllib.quote(cmd)
+        urllib2.urlopen(urllib2.Request(u, ''), timeout=60)
+        return True
+    except:
+        return False
+
+
 def gray_of(bm, maxw):
     """downscaled 8-bit luminance as a flat list, plus its size"""
     from System.Drawing.Imaging import PixelFormat, ImageLockMode
@@ -335,6 +347,9 @@ def refine_quad(buf, stride, w, h, quad, t):
 
 
 URL = str(url) if url else 'http://192.168.1.23:8080/?action=snapshot'
+HOST = 'http://192.168.1.23:7125'
+PARK = True if park is None else bool(park)
+PARKCMD = str(park_cmd) if park_cmd else 'PLOT_CAM_PARK'
 THRESH = int(thresh) if thresh is not None else -1
 MINA = float(min_area) if min_area is not None else 0.02
 DEBUG = True if debug is None else bool(debug)
@@ -391,6 +406,17 @@ else:
         if H is None:
             info = 'not calibrated yet - set calib_img / calib_bed and press calibrate'
         else:
+            # An overhead camera looks straight through the gantry, so the beam
+            # has to be moved off the sheet before the frame is any use. The
+            # back strip is already the exclusion zone the pen cannot reach, so
+            # parking there costs no printable area. PLOT_CAM_PARK ends in M400
+            # so this returns only once the motion has actually finished.
+            parked = ''
+            if PARK:
+                if send_gcode(HOST, PARKCMD):
+                    parked = 'parked | '
+                else:
+                    parked = 'PARK FAILED (printer off?) | '
             bm = grab(URL)
             if bm is None:
                 info = 'no frame from %s (printer off, or wrong URL?)' % URL
@@ -450,11 +476,26 @@ else:
                                 w_mm = math.sqrt((p1[0]-p0[0])**2 + (p1[1]-p0[1])**2)
                                 h_mm = math.sqrt((p2[0]-p0[0])**2 + (p2[1]-p0[1])**2)
                                 skew = math.degrees(math.atan2(p1[1]-p0[1], p1[0]-p0[0]))
-                                info = ('FOUND paper %.1f x %.1f mm, skew %+.2f deg | '
-                                        'threshold %d (%s), %.0f%% of frame | '
+                                # local scale from the homography at each corner -
+                                # tells you how much a pixel is worth there, which
+                                # is the honest measure of how far to trust it
+                                mmpx = []
+                                for (qx, qy) in full:
+                                    a = apply_h(H, qx, qy)
+                                    b1 = apply_h(H, qx + 1.0, qy)
+                                    b2 = apply_h(H, qx, qy + 1.0)
+                                    if a and b1 and b2:
+                                        d1 = math.sqrt((b1[0]-a[0])**2 + (b1[1]-a[1])**2)
+                                        d2 = math.sqrt((b2[0]-a[0])**2 + (b2[1]-a[1])**2)
+                                        mmpx.append(0.5 * (d1 + d2))
+                                sc_txt = ''
+                                if mmpx:
+                                    sc_txt = ' | %.3f-%.3f mm/px at the corners' % (min(mmpx), max(mmpx))
+                                info = ('%sFOUND paper %.1f x %.1f mm, skew %+.2f deg | '
+                                        'threshold %d (%s), %.0f%% of frame%s | '
                                         'P0 %.1f,%.1f  P1 %.1f,%.1f  P2 %.1f,%.1f') % (
-                                    w_mm, h_mm, skew, t, 'auto' if THRESH < 0 else 'manual',
-                                    frac * 100.0, p0[0], p0[1], p1[0], p1[1], p2[0], p2[1])
+                                    parked, w_mm, h_mm, skew, t, 'auto' if THRESH < 0 else 'manual',
+                                    frac * 100.0, sc_txt, p0[0], p0[1], p1[0], p1[1], p2[0], p2[1])
                             else:
                                 info = 'corners did not split cleanly front/back - check the calibration'
                         if DEBUG:

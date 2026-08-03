@@ -124,6 +124,31 @@ least-squares fit a line through ~40 crossings per edge, and intersect
 neighbours. Sampling those scans with nearest-neighbour quantises every one to a
 whole pixel and put a hard floor at 0.63 mm — bilinear removed it.
 
+**Camera placement matters more than the algorithm.** Modelled as a pinhole
+against the 350 mm bed, 1280×720:
+
+| rig | whole bed in frame? | mm/px across the bed | corner error @0.3 px |
+|---|---|---|---|
+| corner mount, 60° | **no** | 0.145–0.646 (**4.5×**) | 0.04–0.19 mm |
+| overhead 500 mm, 60° | no | uniform | 0.14 mm |
+| overhead 560 mm, 60° | **yes** | **1.0×** | 0.15 mm |
+| overhead 430 mm, 78° | yes | 1.0× | 0.16 mm |
+
+A corner mount can't see the whole bed at a normal 60° FOV — you cannot register
+a sheet that is out of frame — and its scale varies 4.5× across the bed, so
+accuracy silently depends on where the paper happens to sit. Overhead gives a
+uniform ~0.15 mm everywhere. With a standard 60° webcam that needs about
+**560 mm** above the bed (the limit is the short axis of a 16:9 sensor); a 78°
+wide-angle fits at ~430 mm. The capture reports the actual mm/px at each
+detected corner, so the real figure is visible rather than assumed.
+
+**An overhead camera looks straight through the gantry**, so the beam has to be
+moved before the frame is worth anything. `PLOT_CAM_PARK` (in `cam_macros.cfg`)
+sends it to the back of the bed and raises Z — and the back strip is already the
+zone the pen cannot reach because of the 58 mm offset, so this costs no
+printable area. It ends in `M400`, so capture only proceeds once the move has
+actually finished rather than merely been queued.
+
 > **Untested against a real camera frame.** Everything above is verified on
 > synthetic frames through a simulated tilted camera. Thresholding a real bed —
 > lighting, the mesh texture, glare off the sheet — is exactly the part that
