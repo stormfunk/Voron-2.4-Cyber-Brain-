@@ -194,6 +194,14 @@ silently drawing nothing.
 
 ![ascii compare](screenshots/ascii_compare.png)
 
+11,688 strokes over a 161×81 cell grid at 2 mm pitch, rendered at the real
+0.3 mm pen width so the weight is what will land on paper. The silhouette
+resolves in `o`, the sun disc behind it in `^`, and the background falls away
+through `'` to `.` — eight glyphs carrying the tonal range that a single
+character was carrying before.
+
+![ascii eva](screenshots/ascii_eva.png)
+
 ### THINOUT — dropping ink the pen cannot resolve
 
 ![thinout](screenshots/canvas/thinout.png)
