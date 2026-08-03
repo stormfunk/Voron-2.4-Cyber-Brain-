@@ -146,6 +146,37 @@ spacing parameter to keep in sync.
 Pattern generators are just curve sources — baked Rhino curves work equally
 well, and slot 1 is wired for exactly that.
 
+### SVG import — artwork from anywhere
+
+![svg import](screenshots/canvas/svg_import.png)
+
+Point it at an `.svg` and it emits plotter curves with a pen number each, so the
+rig draws artwork from Illustrator, Inkscape, Figma or a plotter-art library —
+not only what Grasshopper generates.
+
+It handles the parts of SVG that describe a line: every path command including
+relative forms, arcs, and the smooth/shorthand curves, plus `rect` (plain and
+rounded), `circle`, `ellipse`, `line`, `polyline` and `polygon`, with transforms
+composed down the whole element tree. Everything is flattened to polylines
+because that is what the pen draws anyway; `tol` sets how finely. Hidden
+elements and `<defs>`-style template blocks are skipped, and fills are ignored —
+a pen plotter draws outlines.
+
+Pens come from one of three mappings:
+
+| `pen_mode` | mapping |
+|---|---|
+| ONE PEN | everything on `pen` |
+| BY LAYER | each top-level `<g>` becomes the next pen — how Illustrator and Inkscape both write layers |
+| BY COLOUR | each distinct colour becomes the next pen, in the order first seen |
+
+Colour falls back to `fill` when there is no `stroke`, and inherits down the
+tree — most real artwork sets its colour once on a parent group and never
+touches the paths. Only layers that actually contain geometry consume a pen
+index, so a stray `<defs>` block does not shift everything by one.
+
+### The layer table
+
 ![layer table](screenshots/canvas/layer_table.png)
 
 Six slots, each assigned a pen number (0 = off). Slots are interchangeable:
@@ -376,6 +407,7 @@ a 0.8 mm roller looks like a 0.8 mm roller on screen.
 | `circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
 | `pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
 | `ascii_component.py` | ASCII SHADER: image → shape-matched characters |
+| `svg_component.py` | SVG IMPORT: any `.svg` → pen-assigned curves |
 | `pen_commit_macros.cfg` | `PEN_COMMIT` / `PEN_TWEAK` — append to the printer's `pen_macros.cfg` |
 | `pen_widths.json` | Line weight per pen |
 | `paper_registration.json` | Last taught paper corners (also on the printer) |

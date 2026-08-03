@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+  <g id="squares">
+    <path d="M0,0 H10 V10 H0 Z" stroke="#000000"/>
+    <rect x="20" y="0" width="20" height="10" stroke="#ff0000"/>
+  </g>
+  <g id="curves" transform="translate(0,20)">
+    <path d="M0,0 C0,10 10,10 10,0" stroke="#0000ff"/>
+    <path d="M20,0 A5,5 0 0 1 30,0" stroke="#00ff00"/>
+    <path d="M40,0 q5,10 10,0" stroke="#0000ff"/>
+  </g>
+  <g id="prims" transform="translate(0,40)">
+    <circle cx="10" cy="10" r="10" stroke="#000000"/>
+    <polygon points="30,0 40,0 40,10" stroke="#000000"/>
+    <line x1="50" y1="0" x2="60" y2="0" stroke="#000000"/>
+    <ellipse cx="80" cy="10" rx="10" ry="10" stroke="#000000"/>
+  </g>
+  <g id="nested" transform="translate(0,70)">
+    <g transform="scale(2)">
+      <path d="M0,0 h5" stroke="#000000"/>
+    </g>
+    <g transform="translate(30,0) rotate(90)">
+      <path d="M0,0 L10,0" stroke="#000000"/>
+    </g>
+  </g>
+  <g id="invisible" style="display:none">
+    <path d="M0,0 L100,100" stroke="#000000"/>
+  </g>
+</svg>
