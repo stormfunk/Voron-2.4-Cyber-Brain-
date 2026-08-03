@@ -74,6 +74,36 @@ if attract:
         if ac is not None:
             acrvs.append(ac)
 
+def at_len(cum, pts, s):
+    """point at arc length s, interpolated from a prebuilt table.
+
+    Curve.LengthParameter costs ~680us a call because it solves for arc length
+    every single time; dashing a page of linework asks for it ~10k times, which
+    was 7 of this component's 11.6 seconds. Sampling each curve once up front
+    and interpolating turns that into a binary search. Z is interpolated too, so
+    the pressure channel survives exactly as it did before."""
+    n = len(cum)
+    if s <= 0.0:
+        return pts[0]
+    if s >= cum[n - 1]:
+        return pts[n - 1]
+    lo = 0
+    hi = n - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if cum[mid] <= s:
+            lo = mid
+        else:
+            hi = mid
+    span = cum[hi] - cum[lo]
+    f = 0.0 if span < 1e-12 else (s - cum[lo]) / span
+    a = pts[lo]
+    b = pts[hi]
+    return rg.Point3d(a.X + (b.X - a.X) * f,
+                      a.Y + (b.Y - a.Y) * f,
+                      a.Z + (b.Z - a.Z) * f)
+
+
 out_crvs = []
 info = ''
 if not ON:
@@ -86,6 +116,25 @@ elif cs:
         L = c.GetLength()
         if L < 0.05:
             continue
+        # sample this curve once into an arc-length table (see at_len)
+        tn = int(L / (STEP * 0.5))
+        if tn < 16:
+            tn = 16
+        if tn > 20000:
+            tn = 20000
+        tts = c.DivideByCount(tn, True)
+        if not tts:
+            continue
+        tpts = []
+        for tt in tts:
+            tpts.append(c.PointAt(tt))
+        tcum = [0.0]
+        for k in range(1, len(tpts)):
+            tcum.append(tcum[k - 1] + tpts[k - 1].DistanceTo(tpts[k]))
+        # work in the table's own metric so dashes stay evenly spaced in it
+        L = tcum[len(tcum) - 1]
+        if L < 0.05:
+            continue
         # deterministic per-curve LCG for phase + jitter (repeatable plots)
         rst = ((ci + 1) * 2654435761 + 12345) & 0x7FFFFFFF
         rst = (rst * 1103515245 + 12345) & 0x7FFFFFFF
@@ -96,10 +145,7 @@ elif cs:
         while s < L - 0.02 and guard < 20000:
             guard += 1
             s_eval = s if s > 0.0 else 0.0
-            ok, t = c.LengthParameter(s_eval)
-            if not ok:
-                break
-            pt = c.PointAt(t)
+            pt = at_len(tcum, tpts, s_eval)
             # driver value 0..1 at this position
             if MODE == 1:
                 d = 1e9
@@ -146,9 +192,7 @@ elif cs:
                         n = 1
                     lp = List[rg.Point3d]()
                     for k in range(n + 1):
-                        ok2, tk = c.LengthParameter(s0 + (e0 - s0) * k / float(n))
-                        if ok2:
-                            lp.Add(c.PointAt(tk))
+                        lp.Add(at_len(tcum, tpts, s0 + (e0 - s0) * k / float(n)))
                     if lp.Count >= 2:
                         out_crvs.append(rg.PolylineCurve(lp))
                         n_pieces += 1

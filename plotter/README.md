@@ -176,6 +176,22 @@ bottom-left to top-right picks `/`; a horizontal one picks `=` or `_`. The
 `edge` slider trades shape-matching against pure density.
 (Technique after [alexharri.com/blog/ascii-rendering](https://alexharri.com/blog/ascii-rendering).)
 
+Cell and glyph are compared in **absolute** terms — how much ink sits in each
+region, 0–1 — with glyph coverage calibrated so the densest glyph in the set
+reads as 1.0. Normalising each cell by its own peak instead seems reasonable and
+is badly wrong: it discards how dark the cell is, so every smooth gradient
+becomes "uniformly full" and matches whichever glyph covers all nine bins.
+
+**Auto-levels** runs before matching. Luminance weights red at 0.299, so a
+saturated red field reads as ink ≈ 0.66 despite looking bright — an image like a
+red sky lands entirely at the dark end and can only reach the densest glyphs.
+The ink range actually present is stretched onto 0–1 (measured inside the
+image's own rect, so the white margin cannot drag the low end down), and the
+range used is reported in the manifest. `gamma` still applies on top.
+
+Characters with no glyph in the stroke font are dropped and named, rather than
+silently drawing nothing.
+
 ![ascii compare](screenshots/ascii_compare.png)
 
 ### THINOUT — dropping ink the pen cannot resolve
@@ -252,6 +268,17 @@ welded 12 touching stroke ends (12 pen lifts saved)
   grid searched ring-by-ring, stopping once the ring's inner edge is further
   than the best candidate found: **10.7 s**, identical result (travel 24.8 m →
   11.6 m either way).
+- **`Curve.LengthParameter` costs ~680 µs a call.** It solves for arc length
+  every time. VARDASH asked for it ~10,000 times per solve — 7 of its 11.6
+  seconds. Each curve is now sampled once into an arc-length table and looked up
+  by binary search: **11.6 s → 0.4 s**, with Z interpolated so the pressure
+  channel survives untouched.
+- **The ASCII shader was picking one character for the entire image.** Two
+  independent causes, both invisible in a synthetic test: normalising each cell
+  by its own peak discarded density (so everything matched `o`), and the red-
+  heavy source never reached the light end of the charset. Fixed by absolute
+  coverage matching plus auto-levels. Resampling the image onto the region grid
+  with GDI+ instead of 4 subsamples per region took it **12.7 s → 6.0 s**.
 - **Small closed curves plotted as triangles.** `DivideByLength` collapsed them
   to three points. There is now a segment-count floor for short/closed curves.
 - **The pen offset was measured, not assumed.** A 4-point bed measurement found
