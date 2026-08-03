@@ -76,6 +76,14 @@ Grasshopper so the paper outline updates live in the viewport as each corner
 lands. This handles a **skewed** sheet — the paper frame is derived from the
 three points, so artwork is rotated to match rather than assuming square.
 
+The jog buttons are laid out as a cross, oriented as you look down at the bed —
+Y+ away from you, X+ to the right, `home` in the middle — so you press the
+direction you want the head to move rather than reading a label. The TEACH
+buttons sit in the same relation as the corners they teach: back-left above
+front-left, front-right to its right. Same geometry for the pen trim buttons.
+It is worth keeping this arrangement; a socket-ordered column is tidier on
+paper and materially worse to actually use.
+
 ![registration sync](screenshots/canvas/registration_sync.png)
 
 The area behind the paper that the pen physically cannot reach (a consequence
