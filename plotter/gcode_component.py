@@ -19,7 +19,7 @@
 import Rhino.Geometry as rg
 import rhinoscriptsyntax as rs
 import scriptcontext as sc
-import os, math, json
+import os, math, json, time
 from System.Collections.Generic import List
 try:
     sc.doc = ghdoc
@@ -356,6 +356,7 @@ WELD = float(weld) if weld is not None else 0.1
 if WELD < 0.0:
     WELD = 0.0
 n_welds = 0
+_opt_notes = []
 pass_strokes = {}
 for k in range(len(passes)):
     pn = passes[k]
@@ -433,6 +434,120 @@ for k in range(len(passes)):
                 pl = list(reversed(pl))
             ordered.append(pl)
             cx = pl[-1].X; cy = pl[-1].Y
+
+    # ---- 2-opt refinement of the travel order ----
+    # Reversing the run of strokes p..q also reverses each stroke's direction,
+    # and every link INSIDE that run keeps its length - so the whole move costs
+    # just the two boundary links, which is what makes this affordable.
+    #
+    # Only worth running when it will actually pay. Measured on real jobs:
+    #   2284 dense glyph strokes (median link 0.97mm): -5.5% travel, 5.0s solve
+    #                                                  to save 1.6s of plotting
+    #    286 sparse strokes      (median link 2.91mm): -14.6% travel, 0.5s solve
+    #                                                  to save 2.0s of plotting
+    # Greedy already picks the nearest free endpoint, so on tightly packed work
+    # there is almost no slack left and the pass is a net loss. The gate below
+    # compares predicted saving against predicted solve cost and skips it.
+    n2 = len(ordered)
+    opt_note = ''
+    if n2 > 8:
+        S_x = []; S_y = []; E_x = []; E_y = []
+        for pl in ordered:
+            S_x.append(pl[0].X); S_y.append(pl[0].Y)
+            E_x.append(pl[-1].X); E_y.append(pl[-1].Y)
+        t_before = 0.0; _px = 0.0; _py = 0.0
+        _lk = []
+        for _k2 in range(n2):
+            _d = math.sqrt((S_x[_k2]-_px)**2 + (S_y[_k2]-_py)**2)
+            t_before += _d; _lk.append(_d)
+            _px = E_x[_k2]; _py = E_y[_k2]
+        _lk.sort()
+        _med = _lk[n2 // 2]
+        gain_s = t_before * 0.10 / max(TF, 1) * 60.0   # ~10% is the typical win
+        cost_s = n2 * 0.0022                            # measured solve cost/stroke
+        if gain_s <= cost_s:
+            opt_note = '2-opt skipped (would cost ~%.1fs of solve to save ~%.1fs of plotting)' % (cost_s, gain_s)
+        else:
+            _idx = list(range(n2))
+            _rev = [False] * n2
+            _t0 = time.clock()
+            _moves = 0
+            for _pass in range(6):
+                if time.clock() - _t0 > 4.0:
+                    break
+                _eb = {}
+                for _k2 in range(n2):
+                    _key = (int(E_x[_k2] / _cell), int(E_y[_k2] / _cell))
+                    if _key not in _eb:
+                        _eb[_key] = []
+                    _eb[_key].append(_k2)
+                _gainpass = 0.0
+                for p2 in range(n2):
+                    if (p2 & 127) == 0 and time.clock() - _t0 > 4.0:
+                        break
+                    _ax = E_x[p2-1] if p2 > 0 else 0.0
+                    _ay = E_y[p2-1] if p2 > 0 else 0.0
+                    _cur = math.sqrt((S_x[p2]-_ax)**2 + (S_y[p2]-_ay)**2)
+                    # a longer first link can still pay if the second shrinks more,
+                    # so search past `cur` rather than pruning at it
+                    _R = _cur + _med * 4.0 + _cell
+                    _ci = int(_ax / _cell); _cj = int(_ay / _cell)
+                    _rings = int(_R / _cell) + 1
+                    if _rings > 6:
+                        _rings = 6
+                    _bd = -1e-9; _bq = -1
+                    for _dj in range(-_rings, _rings + 1):
+                        for _di in range(-_rings, _rings + 1):
+                            _key = (_ci + _di, _cj + _dj)
+                            if _key not in _eb:
+                                continue
+                            for q2 in _eb[_key]:
+                                if q2 < p2:
+                                    continue
+                                _d1 = math.sqrt((E_x[q2]-_ax)**2 + (E_y[q2]-_ay)**2)
+                                if _d1 > _R:
+                                    continue
+                                if q2 + 1 < n2:
+                                    _o2 = math.sqrt((E_x[q2]-S_x[q2+1])**2 + (E_y[q2]-S_y[q2+1])**2)
+                                    _n2b = math.sqrt((S_x[p2]-S_x[q2+1])**2 + (S_y[p2]-S_y[q2+1])**2)
+                                else:
+                                    _o2 = 0.0; _n2b = 0.0
+                                _delta = (_d1 + _n2b) - (_cur + _o2)
+                                if _delta < _bd:
+                                    _bd = _delta; _bq = q2
+                    if _bq > p2:
+                        a2 = p2; b2 = _bq
+                        S_x[a2:b2+1] = S_x[a2:b2+1][::-1]; S_y[a2:b2+1] = S_y[a2:b2+1][::-1]
+                        E_x[a2:b2+1] = E_x[a2:b2+1][::-1]; E_y[a2:b2+1] = E_y[a2:b2+1][::-1]
+                        for _k2 in range(a2, b2+1):
+                            S_x[_k2], E_x[_k2] = E_x[_k2], S_x[_k2]
+                            S_y[_k2], E_y[_k2] = E_y[_k2], S_y[_k2]
+                        _idx[a2:b2+1] = _idx[a2:b2+1][::-1]
+                        _sub = _rev[a2:b2+1][::-1]
+                        for _k2 in range(len(_sub)):
+                            _rev[a2 + _k2] = not _sub[_k2]
+                        _gainpass += -_bd
+                        _moves += 1
+                if _gainpass < t_before * 0.001:
+                    break
+            if _moves:
+                _new = []
+                for _k2 in range(n2):
+                    _pl = ordered[_idx[_k2]]
+                    _new.append(list(reversed(_pl)) if _rev[_k2] else _pl)
+                ordered = _new
+                t_after = 0.0; _px = 0.0; _py = 0.0
+                for _k2 in range(n2):
+                    t_after += math.sqrt((S_x[_k2]-_px)**2 + (S_y[_k2]-_py)**2)
+                    _px = E_x[_k2]; _py = E_y[_k2]
+                opt_note = '2-opt: %d reversals, travel %.2fm -> %.2fm (%.0f%% less pen-up)' % (
+                    _moves, t_before / 1000.0, t_after / 1000.0,
+                    100.0 * (t_before - t_after) / t_before if t_before > 0 else 0.0)
+            else:
+                opt_note = '2-opt: no improving reversals found'
+    if opt_note:
+        _opt_notes.append('pen %d: %s' % (pn, opt_note))
+
     # ---- weld: a stroke that starts where the previous one ended is the SAME
     # line as far as the pen is concerned. Separate (unjoined) curves in Rhino
     # would otherwise lift, travel 0mm and drop again at every joint - wasted
@@ -737,6 +852,8 @@ for k in range(len(passes)):
 _man.append('speeds: %s (draw %d / travel %d / accel %d)' % (PROF_NAME, DF, TF, AC))
 if n_welds:
     _man.append('welded %d touching stroke ends (%d pen lifts saved)' % (n_welds, n_welds))
+for _q in _opt_notes:
+    _man.append(_q)
 if WEAR > 0.0001:
     _mx = 0.0
     for k in range(len(passes)):

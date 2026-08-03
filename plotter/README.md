@@ -272,13 +272,16 @@ box mime, and the manifest. Read the manifest before pressing PLOT — it refuse
 to run if the plot falls outside the paper or the machine.
 
 ```
-JOB: 3 pass(es) | est 54.1 min (draw 28.0m, travel 13.4m)
+JOB: 3 pass(es) | est 14.2 min (draw 8.3m, travel 4.1m)
 placement: REGISTERED paper, FIT scale 0.54
-PASS 1 - pen 1 [BLACK FINE]:   459 strokes (3.3m)
-PASS 2 - pen 2 [BLACK BOLD]: 11826 strokes (24.4m)
-PASS 3 - pen 4 [RED FINE]:     102 strokes (0.3m)
+PASS 1 - pen 1 [BLACK FINE]:  456 strokes (3.3m)
+PASS 2 - pen 2 [BLACK BOLD]: 2284 strokes (4.7m)
+PASS 3 - pen 4 [RED FINE]:    102 strokes (0.3m)
 speeds: Normal (draw 3000 / travel 6000 / accel 3000)
-welded 12 touching stroke ends (12 pen lifts saved)
+welded 13 touching stroke ends (13 pen lifts saved)
+pen 1: 2-opt: 97 reversals, travel 1.28m -> 0.82m (36% less pen-up)
+pen 2: 2-opt skipped (would cost ~5.0s of solve to save ~2.9s of plotting)
+pen 4: 2-opt: 17 reversals, travel 0.53m -> 0.48m (10% less pen-up)
 ```
 
 ### Preview and pen legend
@@ -310,6 +313,17 @@ a 0.8 mm roller looks like a 0.8 mm roller on screen.
   grid searched ring-by-ring, stopping once the ring's inner edge is further
   than the best candidate found: **10.7 s**, identical result (travel 24.8 m →
   11.6 m either way).
+- **2-opt only runs where it pays.** After greedy, reversing a run of strokes
+  can shorten the route further — and because reversing a run also flips each
+  stroke's direction, every link *inside* it keeps its length, so a move costs
+  only its two boundary links. But greedy already takes the nearest free
+  endpoint, so on tightly packed work there is nothing left: measured on 2,284
+  glyph strokes (median link 0.97 mm) it bought 5.5% for 5 s of solve to save
+  1.6 s of plotting — a net loss. On 286 sparse strokes (median link 2.91 mm)
+  it bought 14.6% for 0.5 s. So it estimates the payoff first and skips itself
+  when the arithmetic doesn't work, reporting either way in the manifest.
+  Splitting passes per pen helps here: each pass is sparser than the whole job,
+  so a dense pass gets skipped while sparse ones see 10–36%.
 - **`Curve.LengthParameter` costs ~680 µs a call.** It solves for arc length
   every time. VARDASH asked for it ~10,000 times per solve — 7 of its 11.6
   seconds. Each curve is now sampled once into an arc-length table and looked up
