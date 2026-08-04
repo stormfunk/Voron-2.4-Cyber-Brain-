@@ -546,6 +546,87 @@ a 0.8 mm roller looks like a 0.8 mm roller on screen.
 | `pen_widths.json` | Line weight per pen |
 | `paper_registration.json` | Last taught paper corners (also on the printer) |
 | `titleblock_brief.md` | Design brief the titleblock SVG was generated from |
+| `hardware/pen_mount/*.stl` | Printable parts for the pen mount (see below) |
+
+---
+
+## Pen mount
+
+The thing all of the above actually drives. STLs are in
+[`hardware/pen_mount/`](hardware/pen_mount).
+
+It is **specific to the Archetype toolhead** — it is not a general-purpose
+adapter, and it will not fit a stock Stealthburner or a Dragon Burner without
+rework. It mounts in place of the extruder.
+
+**Magnetic quick release.** The pen carrier is held on magnetically, so a pen
+change is a pull and a push rather than screws. This matters more than it
+sounds: a plot with four pens stops four times, and any fastener that needs a
+tool turns each of those pauses into a chance to nudge the machine. The
+tradeoff is that the mount is only as repeatable as the magnets seat it — see
+the note on datums below.
+
+**Linear bearing from the Voron TAP system.** The carriage rides the same rail
+and bearing TAP uses, which is the point: it is a known-good, widely available
+part with no play in the direction that matters, and most Voron owners either
+have one or can get one. The pen carrier travels vertically on it.
+
+**Sprung on the rail.** Pen springs sit on the rail so the pen floats under
+constant force rather than being driven to a hard Z. The pen tracks paper that
+is not perfectly flat, and a small Z error becomes a small pressure change
+instead of a crash or a skipped line. `pen_down_z` sets nominal contact and the
+spring absorbs the rest.
+
+The spring is the reason for the `preload` parameter in the GCODE component:
+at draw height the tip is pressed roughly 1 mm into the paper by spring
+compression. **Travel hop must exceed the preload**, or the pen never actually
+leaves the page. Running a 1.5 mm hop against 1.01 mm of preload leaves ~0.5 mm
+of real clearance, and the pen drags a visible line through every travel move —
+which is exactly what happened, and it corrupted the middle column of every
+camera calibration for days before it was spotted. 4 mm is a sane hop.
+
+**Self-centering collet.** The pen is gripped by a collet, so pens of different
+barrel diameters land on the same axis instead of leaning to whichever side the
+clamp pushes them. Without this, every pen change is also a lateral datum
+change, and the tool table cannot help — it stores an offset per pen, not per
+insertion.
+
+**Frog face on top.** No function. It is a small frog. It is on top.
+
+### Datums and the mount
+
+The tool table stores an XYZ datum per pen, measured by touching the tip to the
+calibration dot. That corrects for pens being different lengths and sitting at
+different depths — but it stores one offset per *pen*, not per *insertion*.
+Anything that changes between insertions of the same pen is not corrected, so
+the mount's job is to make re-seating repeatable enough that it does not need
+to be. Measured across a pen-out / home / QGL / pen-in cycle, the same pen
+returned to within **0.6 mm**.
+
+Pen 1 is the datum every other pen is measured against, so a pen 1 re-seat
+shifts everything with nothing to compensate. If absolute position matters,
+re-touch the dot after fitting pen 1.
+
+### Printing the parts
+
+Exported from Rhino, so the filenames are export order rather than anything
+meaningful. Sizes are the bounding box:
+
+| File | Triangles | Bounding box (mm) |
+|---|---|---|
+| `Green_001.stl` | 3,020 | 34.3 × 17.7 × 68.8 |
+| `Green_002.stl` | 4,428 | 35.0 × 17.0 × 30.0 |
+| `Green_003.stl` | 502 | 8.4 × 14.6 × 14.5 |
+| `Green_004.stl` | 502 | 8.4 × 14.6 × 14.5 |
+| `Green_005.stl` | 15,580 | 33.1 × 33.1 × 22.7 |
+| `Green_006.stl` | 2,700 | 22.5 × 22.5 × 30.6 |
+| `Green_007.stl` | 10,048 | 35.0 × 36.9 × 30.0 |
+| `Green_008.stl` | 32,378 | 35.0 × 36.9 × 30.0 |
+
+`Green_003` and `Green_004` are identical — print two. `Green_007` and
+`Green_008` occupy the same bounding box at very different triangle counts, so
+they are a plain and a detailed variant of the same part rather than two
+different parts; print one.
 
 ---
 
