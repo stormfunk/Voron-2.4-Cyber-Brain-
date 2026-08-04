@@ -80,8 +80,13 @@ PENLOAD = 'penload' in RIT
 PENTABLE = 'pentable' in RIT
 WRITE = False if write is None else bool(write)
 PLOT = False if plot is None else bool(plot)
-OFFX = 0.0      # pen tip offset from nozzle (hardware constant, matches PLACE)
-OFFY = -58.0    # new pen toolhead 2026-07-21: pen 58mm in front of nozzle (was -44.5)
+OFFX = 0.0      # pen tip offset from nozzle (pen 1 datum; matches PLACE)
+# Pen 1 IS the datum, so this constant must equal pen 1's own tip-to-nozzle
+# distance. Measured 2026-08-03 from the calibration dot (bed Y18.6): the felt
+# tip touches at nozzle Y70.5, so 70.5 - 18.6 = 51.9. Re-measure this whenever
+# pen 1 is re-datumed - every other pen is corrected relative to it, so getting
+# this wrong shifts every plot by the difference.
+OFFY = -51.9
 DWELL = float(dot_dwell) if dot_dwell is not None else 50.0
 if DWELL < 0.0: DWELL = 0.0
 DPEN = int(dots_pen) if dots_pen is not None else 2
@@ -638,6 +643,14 @@ L.append('SET_GCODE_OFFSET Z=0')
 L.append('G21')
 L.append('G90')
 # conditional homing + QGL (printer-side macro): skips whatever is already valid
+# ---- probing interlock ----
+# QGL and bed mesh both drive the NOZZLE down onto the bed. A pen sits BELOW
+# the nozzle (pen 3 by 7.5mm), so if one is loaded it is crushed before the
+# probe ever triggers. The job order already assumes the pen goes in later, at
+# PEN_PAUSE - but nothing enforced it, and a pen was destroyed finding that out.
+# Stop and make it explicit instead of trusting the running order.
+if QGL or MESH:
+    L.append('PLOT_PROBE_GUARD QGL=%d' % (1 if QGL else 0))
 L.append('PLOT_HOME_QGL QGL=%d' % (1 if QGL else 0))
 if MESH:
     # declare the plot region as an exclude_object so ADAPTIVE meshing scans
@@ -665,6 +678,17 @@ if MESH:
             _mcx, _mcy, _mx0, _my0, _mx1, _my0, _mx1, _my1, _mx0, _my1))
     L.append('BED_MESH_CALIBRATE ADAPTIVE=1')
 L.append('SET_VELOCITY_LIMIT ACCEL=%d SQUARE_CORNER_VELOCITY=%.1f' % (AC, SCV))
+# Apply the first pass's pen datum BEFORE the outline, not just before its
+# pass. Every Z here is expressed in pen 1's frame, so a pen that reaches
+# lower - pen 3 touches at nozzle Z28.1 against pen 1's Z16.0 - is 12mm past
+# contact at the "pen up" outline height and drags a rectangle across the bed.
+# Applying the datum first puts the whole pre-pause sequence in the loaded
+# pen's frame, and also makes the outline trace where the PEN goes rather than
+# where the nozzle goes. Harmless when no pen is fitted: it is only an offset.
+if PENTABLE and passes:
+    L.append('PEN_APPLY PEN=%d   ; datum first, so pre-draw Z is in this pen\'s frame' % passes[0])
+    L.append('M400')
+
 if OUTLINE:
     # bounding box of everything inked: strokes + dots + signature
     _oxs = list(xs); _oys = list(ys)
@@ -698,7 +722,12 @@ for k in range(len(passes)):
     ordered, mydots = pass_strokes[k]
     L.append('; ======== PASS %d of %d : PEN %d [%s] ========' % (k+1, len(passes), pn, penname(pn)))
     if k > 0 or PENLOAD:
-        L.append('PEN_PAUSE Z=%.3f X=%.1f Y=%.1f PEN=%d COLOR=%s   ; load pen %d [%s], seat to bed, PEN_RESUME' % (PDZ, LX - OFFX, LY - OFFY, pn, penname(pn), pn, penname(pn)))
+        # Klipper splits parameters on whitespace, so a pen name with a space
+        # in it ("BLACK ROLLER") arrives as a stray token and the whole command
+        # is rejected as malformed. Every pen name has been two words since the
+        # palette was relabelled, so this broke every plot until underscored.
+        L.append('PEN_PAUSE Z=%.3f X=%.1f Y=%.1f PEN=%d COLOR=%s   ; load pen %d [%s], seat to bed, PEN_RESUME' % (
+            PDZ, LX - OFFX, LY - OFFY, pn, penname(pn).replace(' ', '_'), pn, penname(pn)))
     if PENTABLE:
         # this pen's stored XYZ datum (see the PEN TOOL TABLE macros). Runs
         # AFTER the swap pause so the freshly-fitted pen is aligned before it

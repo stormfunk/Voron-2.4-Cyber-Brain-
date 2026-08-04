@@ -25,7 +25,9 @@ except:
 
 BED = 350.0
 OFFX = 0.0      # pen tip offset from nozzle (hardware constant)
-OFFY = -58.0    # new pen toolhead 2026-07-21: pen 58mm in front of nozzle (was -44.5)
+# must match GCODE's OFFY - pen 1's own tip-to-nozzle distance, measured from
+# the calibration dot (bed Y18.6): felt tip touches at nozzle Y70.5 -> 51.9mm
+OFFY = -51.9
 REGFILE = r'C:\Users\john.chandler\voron_plotter\paper_registration.json'
 LOCKFILE = r'C:\Users\john.chandler\voron_plotter\placement_lock.json'
 # pmode: 0 = registered paper, 1 = bed centered, 2 = direct (Rhino coords),

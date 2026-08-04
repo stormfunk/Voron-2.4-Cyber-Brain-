@@ -88,6 +88,29 @@ paper and materially worse to actually use.
 
 ![papercam](screenshots/canvas/papercam.png)
 
+> **Status: parked.** It calibrates to 0.34 mm (leave-one-out, all 9 marks) and
+> finds the sheet reliably, but it is not in the working flow — use the manual
+> three-corner registration above. Parked deliberately after the last bug below
+> cost more time than the feature was returning. Everything here works; it is
+> the effort-to-benefit that stalled, not the maths.
+>
+> **A 3×3 grid is symmetric under reflection**, so a mirrored homography fits
+> the marks *exactly as well* as the true one — both to 0.33 mm. No residual can
+> detect it, and neither can any check made against the marks themselves. The X
+> axis was mirrored for days: the marks looked perfect throughout while anything
+> measured off the camera came back with the wrong-sign skew, so a border built
+> to match the sheet was rotated by **twice** its skew. The fix is in
+> `grid_match` and is verified the only way it can be — command the toolhead to
+> a known bed coordinate and photograph where it lands. **Re-verify that way
+> after any change to camera mounting or orientation.**
+>
+> Two other things worth keeping: judge lighting by how many marks survive
+> detection, never by frame brightness (auto-exposure holds the mean constant
+> while the glare changes completely — one controlled source, chamber strip on,
+> room light off); and pinning the camera exposure via crowsnest does not work,
+> because it applies v4l2 controls before ustreamer opens the device and the
+> driver resets them on format set.
+
 The same three corners, without jogging to them. The camera is fixed and the bed
 is flat, so image → bed is exactly a **homography** — a plane-to-plane projective
 map with 8 degrees of freedom, which absorbs the camera's tilt, offset and lens

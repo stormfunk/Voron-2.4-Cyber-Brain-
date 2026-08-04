@@ -315,6 +315,13 @@ else:
             plane = rg.Plane.WorldXY
             tol = 0.001
             n_ch = 0
+            # Which glyphs actually get chosen. This was added while chasing a
+            # bug where EVERY cell matched 'o', and it is worth keeping: if the
+            # histogram collapses onto one or two characters the match has gone
+            # wrong again, and that is invisible from the drawing alone until
+            # you have wasted a sheet on it. (It was previously incremented but
+            # never initialised, which crashed the component on the first cell.)
+            _hist = {}
             flat = GAM == 1.0
             sv = [0.0] * (NR * NR)
             for r in range(nrow):
@@ -383,5 +390,15 @@ else:
                 n_ch, ncol, nrow, CELL, NR * NR, EDGE, nch, len(out_crvs), lo, hi)
             if dropped:
                 info += ' | NOT IN FONT, ignored: %s' % ''.join(dropped)
+            # most-used glyphs first; a healthy render spreads across many
+            _pairs = []
+            for _c in _hist:
+                _pairs.append((_hist[_c], _c))
+            _pairs.sort()
+            _pairs.reverse()
+            _top = []
+            for (_n, _c) in _pairs[:6]:
+                _top.append("%s%d" % (_c, _n))
+            info += ' | %d glyphs used, top: %s' % (len(_pairs), ' '.join(_top))
 
 print(info)
