@@ -429,12 +429,52 @@ On a recent dense plot: 52.25 m of ink → 46.47 m, 11% removed, no visible loss
 
 ![placement](screenshots/canvas/placement.png)
 
-Four modes: registered paper, bed-centred, direct (use the curves' actual
-position in space), or driven from a graph. FIT scales artwork into the sheet;
-LOCK freezes a placement so edits upstream do not shift it. The paper preview
-stays visible in every mode so curves can be oriented against it.
+Five modes: registered paper, bed-centred, direct (use the curves' actual
+position in space), driven from a graph, or **corner stop**. FIT scales artwork
+into the sheet; LOCK freezes a placement so edits upstream do not shift it. The
+paper preview stays visible in every mode so curves can be oriented against it.
 
 ![layout reserved](screenshots/layout_reserved.png)
+
+#### Corner stop — a physical datum instead of a measurement
+
+Alignment marks are scribed on the bed one inch in on both axes. Butt the
+sheet's front-left corner into them, pick the size from the **PAGE SIZE**
+dropdown, and the page frame is known outright — origin, size and orientation,
+with nothing taught and no camera.
+
+This is the most repeatable of the five, and the reason is that it does not
+*measure* anything. Registered paper depends on three corners jogged by eye and
+re-taught whenever the sheet moves; optical registration depends on a
+calibration that has to be redone if the camera is nudged. A scribed mark is
+just there, and it is still there after a power cycle, a paper change, or a
+week away from the machine. The tradeoff is that the sheet has to actually be
+against the stop — it trades a measurement for a physical assumption, so a
+sheet dropped roughly in place will be wrong in a way the software cannot see.
+
+The datum is a **pen-space** coordinate, unlike the taught corners. Those are
+stored as nozzle positions and have the pen offset added back when used; a
+scribed mark is a physical spot on the bed, so it is already where the ink has
+to land. Adding the offset would push the page a pen-length out. Default is
+25.4, 25.4 — wire a point into `corner` to override it.
+
+Orientation is baked into the size choice (a landscape A4 is simply `297x210`)
+rather than being a separate rotate toggle, because a flag on top of a size is
+one more thing to get out of step with how the sheet is physically sitting.
+
+**Not every page fits.** The pen sits ahead of the nozzle, so it reaches only to
+about Y292 while the bed is 350 deep. Butted into the front-left datum, a
+portrait A4 runs to Y322 and its far end is simply undrawable. PLACE says so
+outright rather than silently clipping:
+
+```
+corner: … | page 210x297 at corner 25.4,25.4 -> X 25.4..235.4 Y 25.4..322.4
+        | SHEET OUT OF REACH: the pen cannot reach past Y292, so the far end
+          of this page is undrawable
+```
+
+Landscape A4, both A5 orientations, landscape Letter and the 200 mm square all
+fit. Both A3 orientations and portrait Letter do not.
 
 ### Titleblock
 
