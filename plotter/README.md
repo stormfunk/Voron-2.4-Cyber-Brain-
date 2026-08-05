@@ -49,6 +49,9 @@ the commanded compression—otherwise the pen never fully clears the paper.
 
 ### Bill of materials
 
+> **Complete download:** [Pen Holder QR V3 — Collet Update](https://github.com/stormfunk/Voron-2.4-Cyber-Brain-/releases/tag/pen-holder-qr-v3.0.0)
+> contains the full printable set as one ZIP.
+
 | Qty | Part | Specification / repository file | Purpose |
 |---:|---|---|---|
 | 1 | Archetype toolhead interface | Existing Archetype mount; purple part shown above | Fixed connection to the Voron toolhead |
@@ -58,13 +61,13 @@ the commanded compression—otherwise the pen never fully clears the paper.
 | 2 | Guide fasteners | Approx. M2.5 × 50 mm in the CAD; verify against printed holes | Spring and carrier guidance |
 | 4 pairs | Neodymium magnets | Size to suit the modelled quick-release pockets | Repeatable, tool-free carrier attachment |
 | 1 set | M3 mounting hardware | Lengths to suit the Archetype interface and MGN9 rail | Rail and bracket fastening |
-| 1 | Rail mount | [`Green_001.stl`](hardware/pen_mount/Green_001.stl) | Fixed rail support |
-| 1 | Moving carriage body | [`Green_002.stl`](hardware/pen_mount/Green_002.stl) | Spring-loaded carrier body |
-| 2 | Matching printed details | [`Green_003.stl`](hardware/pen_mount/Green_003.stl) and [`Green_004.stl`](hardware/pen_mount/Green_004.stl) | Identical paired parts |
-| 1 | Collet lock nut | [`Green_005.stl`](hardware/pen_mount/Green_005.stl) | Closes and locks the collet |
-| 1 | Split collet | [`Green_006.stl`](hardware/pen_mount/Green_006.stl) | Self-centres the pen barrel |
-| 1 | Collet holder | Print **one** of [`Green_007.stl`](hardware/pen_mount/Green_007.stl) or [`Green_008.stl`](hardware/pen_mount/Green_008.stl) | Plain and detailed variants of the same holder |
-| 1 | Pen or marker | Diameter must fit the selected collet | Drawing tool |
+| 1 | Rail mount | [`01_Linear Rail Mount.stl`](hardware/pen_mount/01_Linear%20Rail%20Mount.stl) | Fixed rail support |
+| 1 | Moving carriage body | [`02_Linear Rail Carriage.stl`](hardware/pen_mount/02_Linear%20Rail%20Carriage.stl) | Spring-loaded carrier body |
+| 1 | Collet holder | [`03_Collet Holder.stl`](hardware/pen_mount/03_Collet%20Holder.stl) | Threaded housing for the collet system |
+| 1 | Collet lock nut | [`04_Collet Lock Nut.stl`](hardware/pen_mount/04_Collet%20Lock%20Nut.stl) | Closes and locks the collet |
+| 1 | Default collet | [`Collet Default.stl`](hardware/pen_mount/Collet%20Default.stl) | **Recommended starting point; designed to fit most pens** |
+| Optional | Sized collet | [5 mm](hardware/pen_mount/Collet%205mm.stl), [7 mm](hardware/pen_mount/Collet%207mm.stl), [9 mm](hardware/pen_mount/Collet%209mm.stl), [11 mm](hardware/pen_mount/Collet%2011mm.stl), [13 mm](hardware/pen_mount/Collet%2013mm.stl), or [15 mm](hardware/pen_mount/Collet%2015mm.stl) | Optional alternatives for a known pen-barrel diameter; print only the size required |
+| 1 | Pen or marker | Use the default collet first; switch to a labelled size only when needed | Drawing tool |
 
 The spring, magnet and fastener dimensions above reflect the current CAD. Check
 the printed pockets/holes before ordering if you change slicer compensation or
@@ -753,27 +756,25 @@ re-touch the dot after fitting pen 1.
 
 ### Printing the parts
 
-Exported from Rhino, so the filenames are export order rather than anything
-meaningful — see the [Bill of materials](#bill-of-materials) above for what to
-buy alongside them. Sizes are the bounding box, useful for plate layout:
+The fresh V3 export uses functional filenames. For a normal build, print the
+four numbered core parts plus **`Collet Default.stl`**. The default collet is
+intended to fit most pens. The 5–15 mm labelled collets are optional
+alternatives for known barrel diameters; they are not additional required
+parts. Sizes below are the measured STL bounding boxes, useful for plate layout:
 
 | File | Part | Qty | Triangles | Bounding box (mm) |
 |---|---|---:|---:|---|
-| `Green_001.stl` | Rail mount | 1 | 3,020 | 34.3 × 17.7 × 68.8 |
-| `Green_002.stl` | Moving carriage body | 1 | 4,428 | 35.0 × 17.0 × 30.0 |
-| `Green_003.stl` | Matching printed detail | 1 | 502 | 8.4 × 14.6 × 14.5 |
-| `Green_004.stl` | Matching printed detail | 1 | 502 | 8.4 × 14.6 × 14.5 |
-| `Green_005.stl` | Collet lock nut | 1 | 15,580 | 33.1 × 33.1 × 22.7 |
-| `Green_006.stl` | Split collet | 1 | 2,700 | 22.5 × 22.5 × 30.6 |
-| `Green_007.stl` | Collet holder — plain | — | 10,048 | 35.0 × 36.9 × 30.0 |
-| `Green_008.stl` | Collet holder — detailed | — | 32,378 | 35.0 × 36.9 × 30.0 |
-
-Two of these need a decision rather than a straight print, and the geometry
-says why. `Green_003` and `Green_004` are byte-identical at 502 triangles each,
-so they are the paired detail printed twice — not two different parts.
-`Green_007` and `Green_008` occupy exactly the same bounding box at 10k against
-32k triangles, which is a plain and a detailed version of the collet holder:
-**print one of the two**, whichever finish you want.
+| `01_Linear Rail Mount.stl` | Rail mount | 1 | 3,020 | 34.3 × 17.7 × 68.8 |
+| `02_Linear Rail Carriage.stl` | Moving carriage body | 1 | 3,238 | 35.0 × 17.0 × 34.6 |
+| `03_Collet Holder.stl` | Collet holder | 1 | 13,888 | 35.0 × 36.9 × 34.6 |
+| `04_Collet Lock Nut.stl` | Collet lock nut | 1 | 11,728 | 33.1 × 33.1 × 22.7 |
+| `Collet Default.stl` | General-purpose collet | 1 | 2,700 | 22.4 × 22.4 × 30.6 |
+| `Collet 5mm.stl` | Fixed-size collet | Optional | 3,150 | 22.3 × 22.3 × 30.6 |
+| `Collet 7mm.stl` | Fixed-size collet | Optional | 2,734 | 22.3 × 22.3 × 30.6 |
+| `Collet 9mm.stl` | Fixed-size collet | Optional | 2,702 | 22.3 × 22.3 × 30.6 |
+| `Collet 11mm.stl` | Fixed-size collet | Optional | 2,790 | 22.3 × 22.3 × 30.6 |
+| `Collet 13mm.stl` | Fixed-size collet | Optional | 2,798 | 22.3 × 22.3 × 30.6 |
+| `Collet 15mm.stl` | Fixed-size collet | Optional | 2,798 | 22.3 × 22.3 × 30.6 |
 
 ---
 
