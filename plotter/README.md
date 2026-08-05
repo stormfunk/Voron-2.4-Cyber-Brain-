@@ -637,41 +637,53 @@ a 0.8 mm roller looks like a 0.8 mm roller on screen.
 
 ## Files
 
+Every component's source lives in [`nodes/`](nodes). Each file is one GhPython
+component: the code is *pasted into* the component on the canvas rather than
+imported by it, so these are the editable originals and `plotter.gh` carries the
+copy that actually runs. Edit the file, paste it in, save the definition.
+
+`strokefont.py` is the exception and stays in the root: it is `import`ed at
+runtime by the ASCII and titleblock components via an absolute `sys.path`, so
+moving it into `nodes/` breaks both with an ImportError that only appears the
+next time they solve.
+
 | File | What |
 |---|---|
 | `plotter.gh` | The Grasshopper definition (all canvas UI) |
 | `plotter_workspace.3dm` | Rhino workspace, bed model aligned to physical coords |
-| `place_component.py` | PLACE: art → paper mapping, FIT/1:1, LOCK, DIRECT bypass |
-| `gcode_component.py` | GCODE: sampling, passes, ordering, welding, manifest, emission |
-| `preview_component.py` | PREVIEW: display shell (plan geometry drawn raw) |
-| `thinout_component.py` | THINOUT: per-pen culling of unresolvable linework |
-| `titleblock_component.py` | TITLEBLOCK: parametric block, auto-sized to the sheet |
 | `strokefont.py` | Single-stroke engraving font (A–Z 0–9 + punctuation) |
-| `paperreg_component.py` | PAPER REGISTRATION: teach/pull the three corners |
-| `pencal_component.py` | PEN TOOL TABLE: per-pen XYZ datums |
-| `pentrim_component.py` | PEN TRIM: live X/Y/Z nudges mid-plot |
-| `penwidth_component.py` | PEN WIDTHS: line weight per pen |
-| `centre_component.py` | CENTRE: recentre artwork on the sheet |
-| `crop_component.py` | CROP: clip to closed shapes, even-odd |
-| `dash_component.py` | DASH (also the template for new processor blocks) |
-| `vardash_component.py` | VARIABLE DASH: ink/gap by length or attractor |
-| `ca_component.py` | CHROMATIC ABERRATION: 6 offset colour steps |
-| `pressure_component.py` | PRESSURE: writes the Z pressure channel |
-| `hatch_component.py` | HATCH fill: parallel lines / concentric insets |
-| `hilbert_component.py` | HILBERT fill |
-| `flowfield_component.py` | FLOW FIELD fill |
-| `serpentine_component.py` | SERPENTINE fill |
-| `truchet_component.py` | TRUCHET fill |
-| `stipple_component.py` | STIPPLE / TSP-ART |
-| `growth_component.py` | DIFFERENTIAL GROWTH |
-| `contour_component.py` | CONTOUR / iso-lines |
-| `circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
-| `pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
-| `ascii_component.py` | ASCII SHADER: image → shape-matched characters |
-| `svg_component.py` | SVG IMPORT: any `.svg` → pen-assigned curves |
-| `separation_component.py` | COLOUR SEPARATION: image → one halftone pass per pen |
-| `papercam_component.py` | PAPERCAM: bed camera → paper corners (homography + edge fit) |
+| `nodes/place_component.py` | PLACE: art → paper mapping, FIT/1:1, LOCK, DIRECT bypass |
+| `nodes/gcode_component.py` | GCODE: sampling, passes, ordering, welding, manifest, emission |
+| `nodes/preview_component.py` | PREVIEW: display shell (plan geometry drawn raw) |
+| `nodes/thinout_component.py` | THINOUT: per-pen culling of unresolvable linework |
+| `nodes/titleblock_component.py` | TITLEBLOCK: parametric block, auto-sized to the sheet |
+| `nodes/paperreg_component.py` | PAPER REGISTRATION: teach/pull the three corners |
+| `nodes/pencal_component.py` | PEN TOOL TABLE: per-pen XYZ datums |
+| `nodes/pentrim_component.py` | PEN TRIM: live X/Y/Z nudges mid-plot |
+| `nodes/penwidth_component.py` | PEN WIDTHS: line weight per pen |
+| `nodes/centre_component.py` | CENTRE: recentre artwork on the sheet |
+| `nodes/crop_component.py` | CROP: clip to closed shapes, even-odd |
+| `nodes/dash_component.py` | DASH (also the template for new processor blocks) |
+| `nodes/vardash_component.py` | VARIABLE DASH: ink/gap by length or attractor |
+| `nodes/ca_component.py` | CHROMATIC ABERRATION: 6 offset colour steps |
+| `nodes/pressure_component.py` | PRESSURE: writes the Z pressure channel |
+| `nodes/hatch_component.py` | HATCH fill: parallel lines / concentric insets |
+| `nodes/hilbert_component.py` | HILBERT fill |
+| `nodes/flowfield_component.py` | FLOW FIELD fill |
+| `nodes/serpentine_component.py` | SERPENTINE fill |
+| `nodes/truchet_component.py` | TRUCHET fill |
+| `nodes/stipple_component.py` | STIPPLE / TSP-ART |
+| `nodes/growth_component.py` | DIFFERENTIAL GROWTH |
+| `nodes/contour_component.py` | CONTOUR / iso-lines |
+| `nodes/circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
+| `nodes/pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
+| `nodes/ascii_component.py` | ASCII SHADER: image → shape-matched characters |
+| `nodes/svg_component.py` | SVG IMPORT: any `.svg` → pen-assigned curves |
+| `nodes/separation_component.py` | COLOUR SEPARATION: image → one halftone pass per pen |
+| `nodes/papercam_component.py` | PAPERCAM: bed camera → paper corners (homography + edge fit) |
+| `nodes/plotter_ghpython.py` | The original single-component version, kept for reference |
 | `camera_calibration.json` | Stored image→bed homography (written by CALIBRATE) |
+| `cam_macros.cfg` | Camera park / probe guard / capture lighting macros |
 | `pen_commit_macros.cfg` | `PEN_COMMIT` / `PEN_TWEAK` — append to the printer's `pen_macros.cfg` |
 | `pen_widths.json` | Line weight per pen |
 | `paper_registration.json` | Last taught paper corners (also on the printer) |

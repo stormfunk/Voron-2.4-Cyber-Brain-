@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 # Single-stroke ("engraving") font for pen plotting.
 #
+# LEAVE THIS FILE IN THE PLOTTER ROOT, not in nodes/ with everything else.
+# It is the one .py here that is imported at RUNTIME rather than pasted into a
+# component: ascii_component and titleblock_component both do
+#     sys.path.append(r'C:\Users\john.chandler\voron_plotter'); import strokefont
+# so moving it breaks the ASCII shader and the titleblock with an ImportError
+# that only shows up when those components next solve. If it ever does need to
+# move, change FONTDIR in both of those components to match.
+#
 # Every glyph is a list of polylines on a 0..1 box: x runs 0..width, y runs
 # 0 (baseline) to 1 (cap height). Nothing is filled or outlined - each stroke
 # is drawn once, which is what a pen actually wants.
