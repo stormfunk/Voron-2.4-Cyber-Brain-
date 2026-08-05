@@ -7,11 +7,78 @@ calibration. The Rhino viewport is a digital twin — the bed, the registered
 sheet of paper and the exact emission plan, drawn at the pen widths that will
 actually lay the ink.
 
-![digital twin](screenshots/digital_twin_perspective.png)
+## Hardware
+
+The plotter is a removable pen toolhead built around the Archetype interface.
+It replaces the extruder for plotting, but does not require permanent changes
+to the Voron. A short MGN9 rail constrains the pen carrier, twin springs provide
+compliant drawing pressure, and a self-centring collet keeps different pen
+diameters on the same axis.
+
+![assembled pen-plotter mount](hardware/pen_mount/images/assembled-axo.png)
+
+### How the mechanism works
+
+1. **Archetype interface.** The purple rear bracket locates the complete plotter
+   on the Archetype toolhead in place of the extruder.
+2. **Linear guidance.** A 50 mm MGN9 rail and MGN9H carriage allow only vertical
+   pen motion, preventing the lateral play that would show up as doubled or
+   offset lines.
+3. **Compliant pressure.** Two compression springs preload the moving carrier.
+   Klipper commands nominal Z contact and the springs absorb bed/paper variation;
+   pressure modulation is implemented as small additional Z compression.
+4. **Repeatable pen axis.** The split collet closes concentrically around the
+   barrel when the threaded lock nut is tightened. Different barrel diameters
+   therefore remain centred instead of being pushed against one side of a clamp.
+5. **Fast changes and calibration.** A magnetic quick release makes multi-pen
+   swaps tool-free. The software stores a separate XYZ datum for each pen to
+   correct its length and small re-seating differences.
+
+The pen tip is **58 mm in front of the nozzle datum**. The Grasshopper model
+stays in pen coordinates; that fixed hardware offset is applied only when
+G-code is emitted. The spring preload also explains why travel hop must exceed
+the commanded compression—otherwise the pen never fully clears the paper.
+
+![exploded axonometric view](hardware/pen_mount/images/exploded-axo-front.png)
+
+<p align="center">
+  <img src="hardware/pen_mount/images/exploded-axo-reverse.png" alt="reverse exploded axonometric view" width="49%">
+  <img src="hardware/pen_mount/images/exploded-side.png" alt="exploded side view" width="49%">
+</p>
+
+### Bill of materials
+
+| Qty | Part | Specification / repository file | Purpose |
+|---:|---|---|---|
+| 1 | Archetype toolhead interface | Existing Archetype mount; purple part shown above | Fixed connection to the Voron toolhead |
+| 1 | Linear rail | MGN9, 50 mm long | Vertical guide |
+| 1 | Linear carriage | MGN9H | Low-play moving bearing block |
+| 2 | Compression springs | Approx. 4.4 mm OD × 25.5 mm free length in the CAD | Compliant pen preload |
+| 2 | Guide fasteners | Approx. M2.5 × 50 mm in the CAD; verify against printed holes | Spring and carrier guidance |
+| 4 pairs | Neodymium magnets | Size to suit the modelled quick-release pockets | Repeatable, tool-free carrier attachment |
+| 1 set | M3 mounting hardware | Lengths to suit the Archetype interface and MGN9 rail | Rail and bracket fastening |
+| 1 | Rail mount | [`Green_001.stl`](hardware/pen_mount/Green_001.stl) | Fixed rail support |
+| 1 | Moving carriage body | [`Green_002.stl`](hardware/pen_mount/Green_002.stl) | Spring-loaded carrier body |
+| 2 | Matching printed details | [`Green_003.stl`](hardware/pen_mount/Green_003.stl) and [`Green_004.stl`](hardware/pen_mount/Green_004.stl) | Identical paired parts |
+| 1 | Collet lock nut | [`Green_005.stl`](hardware/pen_mount/Green_005.stl) | Closes and locks the collet |
+| 1 | Split collet | [`Green_006.stl`](hardware/pen_mount/Green_006.stl) | Self-centres the pen barrel |
+| 1 | Collet holder | Print **one** of [`Green_007.stl`](hardware/pen_mount/Green_007.stl) or [`Green_008.stl`](hardware/pen_mount/Green_008.stl) | Plain and detailed variants of the same holder |
+| 1 | Pen or marker | Diameter must fit the selected collet | Drawing tool |
+
+The spring, magnet and fastener dimensions above reflect the current CAD. Check
+the printed pockets/holes before ordering if you change slicer compensation or
+exported geometry. Printable files, dimensions and datum notes are collected in
+the detailed [Pen mount](#pen-mount) section below.
+
+![collet and lock-nut detail](hardware/pen_mount/images/collet-detail.png)
 
 ---
 
-## Architecture
+## Software architecture
+
+![digital twin](screenshots/digital_twin_perspective.png)
+
+---
 
 ```
 GENERATORS         PROCESSORS          LAYER TABLE      THINOUT       PLACE            GCODE            PREVIEW
