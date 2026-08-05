@@ -21,9 +21,10 @@ diameters on the same axis.
 
 1. **Archetype interface.** The purple rear bracket locates the complete plotter
    on the Archetype toolhead in place of the extruder.
-2. **Linear guidance.** A 50 mm MGN9 rail and MGN9H carriage allow only vertical
-   pen motion, preventing the lateral play that would show up as doubled or
-   offset lines.
+2. **Linear guidance.** The 50 mm MGN9 rail and MGN9H carriage are the same
+   parts used by the Voron **TAP nozzle-levelling design**. They allow only
+   vertical pen motion, preventing the lateral play that would show up as
+   doubled or offset lines.
 3. **Compliant pressure.** Two compression springs preload the moving carrier.
    Klipper commands nominal Z contact and the springs absorb bed/paper variation;
    pressure modulation is implemented as small additional Z compression.
@@ -51,8 +52,8 @@ the commanded compression—otherwise the pen never fully clears the paper.
 | Qty | Part | Specification / repository file | Purpose |
 |---:|---|---|---|
 | 1 | Archetype toolhead interface | Existing Archetype mount; purple part shown above | Fixed connection to the Voron toolhead |
-| 1 | Linear rail | MGN9, 50 mm long | Vertical guide |
-| 1 | Linear carriage | MGN9H | Low-play moving bearing block |
+| 1 | Linear rail | MGN9, 50 mm long—the rail used by the Voron TAP nozzle-levelling design | Vertical guide |
+| 1 | Linear carriage | MGN9H—matching Voron TAP carriage | Low-play moving bearing block |
 | 2 | Compression springs | Approx. 4.4 mm OD × 25.5 mm free length in the CAD | Compliant pen preload |
 | 2 | Guide fasteners | Approx. M2.5 × 50 mm in the CAD; verify against printed holes | Spring and carrier guidance |
 | 4 pairs | Neodymium magnets | Size to suit the modelled quick-release pockets | Repeatable, tool-free carrier attachment |
