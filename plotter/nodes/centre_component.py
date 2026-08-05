@@ -12,7 +12,10 @@ import json
 
 REGFILE = r'C:\Users\john.chandler\voron_plotter\paper_registration.json'
 PADNAME = 'ARTWORK position'
-OFFY = -58.0          # new pen toolhead 2026-07-21: pen 58mm in front of nozzle
+# Pen tip offset from the nozzle. MUST match GCODE and PLACE - this was left at
+# the old nominal 58.0 when those were re-measured to 51.9 against the
+# calibration dot, which silently put every CENTRE 6.1mm out in Y.
+OFFY = -51.9
 BED = 350.0
 
 

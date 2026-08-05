@@ -148,7 +148,10 @@ paper = []; labels = []
 # ---- unreachable zone: the pen sits OFFY in front of the nozzle, so when the
 # nozzle hits its Y limit the pen still stops short - that back strip can never
 # be drawn on. Shown as a diagonally hatched red band.
-OFFY_HW = -58.0                     # pen offset from nozzle (hardware constant)
+# MUST match GCODE and PLACE. Left at the old nominal 58.0 when those were
+# re-measured to 51.9 against the calibration dot, so the band was drawn 6.1mm
+# deeper than the pen actually loses - i.e. it warned about reachable bed.
+OFFY_HW = -51.9                     # pen offset from nozzle (hardware constant)
 view_exclusion = []
 _ylim = BED + OFFY_HW               # highest Y the PEN can reach
 if _ylim < BED - 0.5:

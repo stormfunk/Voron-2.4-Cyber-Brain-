@@ -34,7 +34,7 @@ diameters on the same axis.
    swaps tool-free. The software stores a separate XYZ datum for each pen to
    correct its length and small re-seating differences.
 
-The pen tip is **58 mm in front of the nozzle datum**. The Grasshopper model
+The pen tip is **51.9 mm in front of the nozzle datum** (measured against the calibration dot for the pen currently held as pen 1; 58 mm was the earlier nominal figure). The Grasshopper model
 stays in pen coordinates; that fixed hardware offset is applied only when
 G-code is emitted. The spring preload also explains why travel hop must exceed
 the commanded compression—otherwise the pen never fully clears the paper.
@@ -98,7 +98,7 @@ through chromatic aberration onto separate pens, crop it to a shape.
 ### Conventions worth knowing
 
 - **Everything is pen-space.** The whole pipeline works in physical *ink*
-  positions. The pen sits **58 mm in front of the nozzle**; that offset is
+  positions. The pen sits **51.9 mm in front of the nozzle**; that offset is
   applied only when G-code text is written. Nothing upstream ever thinks about
   the nozzle.
 - **Z is the pressure channel.** A curve's Z coordinate is a pressure offset in
@@ -203,8 +203,9 @@ of a mark drawn badly — instead of the meaningless zero that four points alway
 produce. On a synthetic frame through a keystoned, 180°-flipped camera: 9/9
 marks matched, residual mean 0.064 mm, worst 0.128 mm.
 
-The marks are placed within X 0–350 and **Y 0–292**, because the pen sits 58 mm
-in front of the nozzle and cannot reach the back strip.
+The marks are placed within X 0–350 and **Y 0–292**, because the pen sits
+51.9 mm in front of the nozzle and cannot reach the back strip. Geometrically
+the pen reaches about Y298; 292 is kept as a conservative working limit.
 
 **A flipped camera needs no correction.** A homography is projective, so it
 absorbs 180° rotation (and any other) completely — the correspondence step finds
@@ -257,7 +258,7 @@ detected corner, so the real figure is visible rather than assumed.
 **An overhead camera looks straight through the gantry**, so the beam has to be
 moved before the frame is worth anything. `PLOT_CAM_PARK` (in `cam_macros.cfg`)
 sends it to the back of the bed and raises Z — and the back strip is already the
-zone the pen cannot reach because of the 58 mm offset, so this costs no
+zone the pen cannot reach because of the 51.9 mm offset, so this costs no
 printable area. It ends in `M400`, so capture only proceeds once the move has
 actually finished rather than merely been queued.
 
@@ -272,7 +273,7 @@ actually finished rather than merely been queued.
 ![registration sync](screenshots/canvas/registration_sync.png)
 
 The area behind the paper that the pen physically cannot reach (a consequence
-of the 58 mm offset) is drawn as a red hatched exclusion zone.
+of the 51.9 mm offset) is drawn as a red hatched exclusion zone.
 
 ![exclusion zone](screenshots/exclusion_zone.png)
 
@@ -752,23 +753,26 @@ re-touch the dot after fitting pen 1.
 ### Printing the parts
 
 Exported from Rhino, so the filenames are export order rather than anything
-meaningful. Sizes are the bounding box:
+meaningful — see the [Bill of materials](#bill-of-materials) above for what to
+buy alongside them. Sizes are the bounding box, useful for plate layout:
 
-| File | Triangles | Bounding box (mm) |
-|---|---|---|
-| `Green_001.stl` | 3,020 | 34.3 × 17.7 × 68.8 |
-| `Green_002.stl` | 4,428 | 35.0 × 17.0 × 30.0 |
-| `Green_003.stl` | 502 | 8.4 × 14.6 × 14.5 |
-| `Green_004.stl` | 502 | 8.4 × 14.6 × 14.5 |
-| `Green_005.stl` | 15,580 | 33.1 × 33.1 × 22.7 |
-| `Green_006.stl` | 2,700 | 22.5 × 22.5 × 30.6 |
-| `Green_007.stl` | 10,048 | 35.0 × 36.9 × 30.0 |
-| `Green_008.stl` | 32,378 | 35.0 × 36.9 × 30.0 |
+| File | Part | Qty | Triangles | Bounding box (mm) |
+|---|---|---:|---:|---|
+| `Green_001.stl` | Rail mount | 1 | 3,020 | 34.3 × 17.7 × 68.8 |
+| `Green_002.stl` | Moving carriage body | 1 | 4,428 | 35.0 × 17.0 × 30.0 |
+| `Green_003.stl` | Matching printed detail | 1 | 502 | 8.4 × 14.6 × 14.5 |
+| `Green_004.stl` | Matching printed detail | 1 | 502 | 8.4 × 14.6 × 14.5 |
+| `Green_005.stl` | Collet lock nut | 1 | 15,580 | 33.1 × 33.1 × 22.7 |
+| `Green_006.stl` | Split collet | 1 | 2,700 | 22.5 × 22.5 × 30.6 |
+| `Green_007.stl` | Collet holder — plain | — | 10,048 | 35.0 × 36.9 × 30.0 |
+| `Green_008.stl` | Collet holder — detailed | — | 32,378 | 35.0 × 36.9 × 30.0 |
 
-`Green_003` and `Green_004` are identical — print two. `Green_007` and
-`Green_008` occupy the same bounding box at very different triangle counts, so
-they are a plain and a detailed variant of the same part rather than two
-different parts; print one.
+Two of these need a decision rather than a straight print, and the geometry
+says why. `Green_003` and `Green_004` are byte-identical at 502 triangles each,
+so they are the paired detail printed twice — not two different parts.
+`Green_007` and `Green_008` occupy exactly the same bounding box at 10k against
+32k triangles, which is a plain and a detailed version of the collet holder:
+**print one of the two**, whichever finish you want.
 
 ---
 
