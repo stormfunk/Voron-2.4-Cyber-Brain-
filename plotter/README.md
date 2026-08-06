@@ -386,7 +386,7 @@ PRESSURE (writes the Z channel from curvature / proximity / image / noise).
 
 ![fills](screenshots/canvas/fills.png)
 
-Eight ways to fill a closed region:
+Nine ways to fill a closed region:
 
 | Fill | Character |
 |---|---|
@@ -398,6 +398,34 @@ Eight ways to fill a closed region:
 | STIPPLE / TSP | blue-noise dots, or one continuous tour through them |
 | DIFFERENTIAL GROWTH | self-repelling loop folded into coral forms |
 | CONTOUR | noise terrain sliced into topographic iso-lines |
+| PAW PRINTS | scattered cat-paw motifs, rotated and size-varied |
+
+#### PAW PRINTS
+
+A *motif* fill rather than a line fill: instead of covering the region with
+strokes it tiles it with one repeated drawn shape — a heel pad and four toes,
+five closed curves per paw. `fill` above zero adds concentric insets inside
+each pad, darkening it toward the solid look of printed paw artwork; left at
+zero it draws outlines only, which is what a pen does best.
+
+Three decisions in it are worth knowing, because each fixes something that
+looked fine on screen and would not have plotted well:
+
+- **Staggered grid with jitter, not random scatter.** Pure random clumps — two
+  paws land on top of each other and leave a hole elsewhere. On paper a clump
+  is not merely ugly, it is a blot where the pen re-inks the same spot. The
+  grid guarantees the spacing; the jitter removes the regularity.
+- **Paws are kept whole.** A candidate is dropped unless it fits entirely
+  inside the region. Clipping at the boundary leaves recognisable fragments —
+  half a toe, a sliced pad — that read as mistakes, where a missing paw reads
+  as deliberate spacing.
+- **Toes are sized and spread so they never touch.** Every crossing would be a
+  spot the pen inks twice.
+
+The scatter is driven by a seeded LCG rather than Python's `random`, so it does
+not re-shuffle every time something upstream changes — a plot you are halfway
+through drawing must not move because you nudged a slider. Change `seed` to get
+a different arrangement, and the same seed always gives the same one.
 
 ![fill patterns](screenshots/fill_patterns.png)
 ![fill patterns 2](screenshots/fill_patterns2.png)
