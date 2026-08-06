@@ -68,7 +68,7 @@ the commanded compression—otherwise the pen never fully clears the paper.
 | 1 | Collet lock nut | [`04_Collet Lock Nut.stl`](hardware/pen_mount/04_Collet%20Lock%20Nut.stl) | Closes and locks the collet |
 | 1 | Default collet | [`Collet Default.stl`](hardware/pen_mount/Collet%20Default.stl) | **Recommended starting point; designed to fit most pens** |
 | Optional | Sized collet | [5 mm](hardware/pen_mount/Collet%205mm.stl), [7 mm](hardware/pen_mount/Collet%207mm.stl), [9 mm](hardware/pen_mount/Collet%209mm.stl), [11 mm](hardware/pen_mount/Collet%2011mm.stl), [13 mm](hardware/pen_mount/Collet%2013mm.stl), or [15 mm](hardware/pen_mount/Collet%2015mm.stl) | Optional alternatives for a known pen-barrel diameter; print only the size required |
-| 1 | Pen or marker | Use the default collet first; switch to a labelled size only when needed | Drawing tool |
+| 1 | Pen or marker | Use the default collet first; switch to a labelled size only when needed | Drawing cool shit |
 
 The spring, magnet and fastener dimensions above reflect the current CAD. Check
 the printed pockets/holes before ordering if you change slicer compensation or
