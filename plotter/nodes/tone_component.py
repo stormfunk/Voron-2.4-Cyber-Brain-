@@ -27,7 +27,7 @@
 # (`out_crvs`), plus `bands` as a tree.
 # Inputs: crvs(list, closed), image(file path), nbands(int), detail(mm grid),
 #         invert(bool), gamma(float, <1 opens shadows), inset(mm),
-#         keep_edge(bool), on(bool bypass)
+#         keep_edge(bool), on(bool bypass), frame(curve), crop(4 numbers)
 import Rhino
 import Rhino.Geometry as rg
 import rhinoscriptsyntax as rs
@@ -70,6 +70,23 @@ if MINA < 0.0: MINA = 0.0
 GAM = float(gamma) if gamma is not None else 1.0
 if GAM < 0.1: GAM = 0.1
 if GAM > 4.0: GAM = 4.0
+# Crop as four fractions of the source image, left/top/right/bottom, origin at
+# the TOP-LEFT because that is how a photograph is read and how every image
+# editor reports a selection. Photographs almost never arrive framed the way the
+# drawing wants them - this one is a cat with a third of the picture given over
+# to a window - and cropping outside then re-exporting loses the link between
+# the canvas and the file it came from. Empty or malformed means the whole image.
+CROP = None
+try:
+    if crop is not None:
+        _cv = [float(v) for v in crop]
+        if len(_cv) == 4:
+            cl = max(0.0, min(1.0, _cv[0])); ct = max(0.0, min(1.0, _cv[1]))
+            cr = max(0.0, min(1.0, _cv[2])); cbm = max(0.0, min(1.0, _cv[3]))
+            if cr - cl > 0.01 and cbm - ct > 0.01:
+                CROP = (cl, ct, cr, cbm)
+except:
+    CROP = None
 INS = float(inset) if inset is not None else 0.0
 if INS < 0.0: INS = 0.0
 EDGE = False if keep_edge is None else bool(keep_edge)
@@ -136,11 +153,38 @@ else:
         # a million calls at this grid size and never returns. Drawing the image
         # into a grid-sized bitmap makes GDI+ do the filtering, then LockBits
         # reads the result in one go.
+        # The crop is applied here, at the one place the image meets the grid:
+        # everything downstream sees a picture of size iw x ih and neither knows
+        # nor cares that it is a window onto a larger file.
+        sxp = 0.0; syp = 0.0
         iw = bmp.Width; ih = bmp.Height
-        sc_img = min(wid / float(iw), hei / float(ih))   # contain, centred
+        if CROP is not None:
+            sxp = CROP[0] * iw; syp = CROP[1] * ih
+            iw = (CROP[2] - CROP[0]) * bmp.Width
+            ih = (CROP[3] - CROP[1]) * bmp.Height
+        else:
+            iw = float(iw); ih = float(ih)
+        # WHERE the photo sits is deliberately independent of the mask. Fitting
+        # to the region's own bounding box seems natural until you swap a full
+        # rectangle for a silhouette: the box narrows, the photo is re-fitted
+        # into it, and every feature slides off the shape it belonged to. Pass
+        # the original picture rectangle as `frame` and the mask can then be any
+        # shape without moving the image. Falls back to the region box when no
+        # frame is given, which is right for the simple full-bleed case.
+        fx0 = x0; fy0 = y0; fw = wid; fh = hei
+        if frame is not None:
+            try:
+                fc = frame if isinstance(frame, rg.Curve) else rs.coercecurve(frame)
+                if fc is not None:
+                    fbb = fc.GetBoundingBox(True)
+                    fx0 = fbb.Min.X; fy0 = fbb.Min.Y
+                    fw = fbb.Max.X - fx0; fh = fbb.Max.Y - fy0
+            except:
+                pass
+        sc_img = min(fw / float(iw), fh / float(ih))     # contain, centred
         dw = iw * sc_img; dh = ih * sc_img
-        ox = x0 + (wid - dw) * 0.5
-        oy = y0 + (hei - dh) * 0.5
+        ox = fx0 + (fw - dw) * 0.5
+        oy = fy0 + (fh - dh) * 0.5
         gw = nx + 1; gh_ = ny + 1
         small = SD.Bitmap(gw, gh_, SD.Imaging.PixelFormat.Format24bppRgb)
         gfx = SD.Graphics.FromImage(small)
@@ -152,7 +196,10 @@ else:
         dyh = dh / sy
         # model Y runs up, image Y runs down: flip by drawing bottom-anchored
         gfx.DrawImage(bmp, SD.RectangleF(float(dx0), float(gh_ - dy0 - dyh),
-                                         float(dxw), float(dyh)))
+                                         float(dxw), float(dyh)),
+                      SD.RectangleF(float(sxp), float(syp),
+                                    float(iw), float(ih)),
+                      SD.GraphicsUnit.Pixel)
         gfx.Dispose()
         bmp.Dispose()
         from System.Drawing.Imaging import ImageLockMode, PixelFormat
@@ -405,6 +452,8 @@ else:
             counts.append(str(bands.Branch(GH_Path(k)).Count))
         info = '%d bands (darkest first): %s curves | grid %dx%d, blur %.1fmm (%d cells), min area %.1fmm2 | levels %.2f-%.2f' % (
             NB, '/'.join(counts), nx, ny, SMOOTH, rad, MINA, lo, hi)
+        if CROP is not None:
+            info += ' | crop %.2f,%.2f-%.2f,%.2f' % CROP
         if clipped:
             info += ' | GRID CAPPED at %d - raise `detail` for a coarser but faster pass' % CAP
         if n_open:

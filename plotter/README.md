@@ -337,6 +337,27 @@ spacing parameter to keep in sync.
 Pattern generators are just curve sources — baked Rhino curves work equally
 well, and slot 1 is wired for exactly that.
 
+### BORDER / FRAME — a rule around the artwork
+
+![frame styles](screenshots/frame_styles.png)
+
+Four corner treatments from the same six sliders: plain, corner ticks, crosses,
+and open corners for crop marks. `rules` and `gap` give concentric lines,
+`radius` rounds them.
+
+`inset` is negative by default, which pushes the frame **outside** the artwork
+rect — a border touching the picture reads as a mistake. Positive values put it
+over the top of the image, so the component says so in its message rather than
+leaving you to wonder.
+
+It is drawn in **artwork space, before placement**, and that is the whole point:
+the border scales, rotates and lands with the picture. Generate a frame after
+placement and it sits in machine coordinates, so it drifts off the page the
+moment `fit to paper` or the sheet size changes.
+
+Toggled from the PLOT RECIPE check list like every other processor, and docked
+into a layer slot so it takes a pen of its own.
+
 ### SVG import — artwork from anywhere
 
 ![svg import](screenshots/canvas/svg_import.png)
