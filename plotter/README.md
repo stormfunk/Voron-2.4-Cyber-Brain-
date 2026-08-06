@@ -59,7 +59,7 @@ the commanded compression—otherwise the pen never fully clears the paper.
 | 1 | Linear carriage | MGN9H—matching Voron TAP carriage | Low-play moving bearing block |
 | 2 | Compression springs | Approx. 4.4 mm OD × 25.5 mm free length in the CAD | Compliant pen preload |
 | 2 | Guide fasteners | Approx. M2.5 × 50 mm in the CAD; verify against printed holes | Spring and carrier guidance |
-| 4 pairs | Neodymium magnets | Size to suit the modelled quick-release pockets | Repeatable, tool-free carrier attachment |
+| 1 pair | Neodymium magnets | Size to suit the modelled quick-release pockets (10mmx4mm)| Repeatable, tool-free carrier attachment |
 | 1 set | M3 mounting hardware | Lengths to suit the Archetype interface and MGN9 rail | Rail and bracket fastening |
 | 1 | Rail mount | [`01_Linear Rail Mount.stl`](hardware/pen_mount/01_Linear%20Rail%20Mount.stl) | Fixed rail support |
 | 1 | Moving carriage body | [`02_Linear Rail Carriage.stl`](hardware/pen_mount/02_Linear%20Rail%20Carriage.stl) | Spring-loaded carrier body |
