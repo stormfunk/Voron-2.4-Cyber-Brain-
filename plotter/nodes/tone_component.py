@@ -55,6 +55,18 @@ if NB > 10: NB = 10
 DET = float(detail) if detail is not None else 1.2
 if DET < 0.3: DET = 0.3
 INV = False if invert is None else bool(invert)
+# Blur radius in mm, applied to the sampled grid before contouring. Fur, hair
+# and film grain sit right on the band thresholds and each speck becomes its own
+# closed loop: an unsmoothed photo of a cat produced 675 regions, most of them
+# smaller than the pen. Blurring first is what turns a photograph into shapes
+# rather than confetti.
+SMOOTH = float(smooth) if smooth is not None else 1.5
+if SMOOTH < 0.0: SMOOTH = 0.0
+# Drop regions below this area. Even after blurring there is a tail of specks;
+# anything the pen cannot draw as a recognisable shape is just travel time and
+# a dot of ink. Applies to holes as well as islands.
+MINA = float(min_area) if min_area is not None else 4.0
+if MINA < 0.0: MINA = 0.0
 GAM = float(gamma) if gamma is not None else 1.0
 if GAM < 0.1: GAM = 0.1
 if GAM > 4.0: GAM = 4.0
@@ -162,6 +174,40 @@ else:
                 row.append((0.299*r + 0.587*g_ + 0.114*b) / 255.0)
             L.append(row)
 
+        # ---- blur the sampled grid ------------------------------------------
+        # Separable box blur, three passes, which approximates a Gaussian well
+        # enough and costs O(n) per pass instead of O(r^2) per pixel.
+        rad = int(round(SMOOTH / max(sx, sy)))
+        if rad > 0:
+            for _pass in range(3):
+                for j in range(gh_):
+                    row = L[j]
+                    acc = []
+                    run = 0.0
+                    for i in range(gw):
+                        run += row[i]
+                        acc.append(run)
+                    nr = []
+                    for i in range(gw):
+                        a = i - rad - 1; b = i + rad
+                        if b > gw - 1: b = gw - 1
+                        hi_ = acc[b]
+                        lo_ = acc[a] if a >= 0 else 0.0
+                        nr.append((hi_ - lo_) / float(b - (a if a >= 0 else -1)))
+                    L[j] = nr
+                for i in range(gw):
+                    acc = []
+                    run = 0.0
+                    for j in range(gh_):
+                        run += L[j][i]
+                        acc.append(run)
+                    for j in range(gh_):
+                        a = j - rad - 1; b = j + rad
+                        if b > gh_ - 1: b = gh_ - 1
+                        hi_ = acc[b]
+                        lo_ = acc[a] if a >= 0 else 0.0
+                        L[j][i] = (hi_ - lo_) / float(b - (a if a >= 0 else -1))
+
         # region membership on the same grid
         plane = rg.Plane.WorldXY
         tol = 0.001
@@ -197,6 +243,24 @@ else:
                 if GAM != 1.0:
                     t = math.pow(t, GAM)
                 L[j][i] = (1.0 - t) if INV else t
+
+        # ---- pad the grid with a ring of "light" ------------------------------
+        # Without this, a dark area running off the edge of the photo produces an
+        # OPEN chain, and closing it later joins its two ends with a straight
+        # line across the picture - which is why the first attempt on a
+        # full-bleed photo came back as two flat shades instead of a cat. One
+        # ring of maximum-value nodes guarantees every contour closes inside the
+        # grid, and it closes along the picture edge where it belongs.
+        PADV = 1.0
+        for j in range(len(L)):
+            L[j].insert(0, PADV)
+            L[j].append(PADV)
+        L.insert(0, [PADV] * (len(L[0])))
+        L.append([PADV] * (len(L[0])))
+        nx = nx + 2
+        ny = ny + 2
+        x0 = x0 - sx
+        y0 = y0 - sy
 
         TABLE = {0: [], 1: [(0, 3)], 2: [(0, 1)], 3: [(1, 3)], 4: [(1, 2)],
                  5: [(0, 3), (1, 2)], 6: [(0, 2)], 7: [(2, 3)], 8: [(2, 3)],
@@ -311,9 +375,17 @@ else:
                 prev = inside
             pathk = GH_Path(k)
             made = 0
+            dropped = 0
             if band is not None:
                 for pth in band:
                     if pth.Count < 3: continue
+                    if MINA > 0.0:
+                        # Clipper area is signed (holes wind the other way), so
+                        # test the magnitude - a speck is a speck either way
+                        a_mm = abs(Clipper.Area(pth)) / (SCALE * SCALE)
+                        if a_mm < MINA:
+                            dropped += 1
+                            continue
                     lp = List[rg.Point3d]()
                     for pt in pth:
                         lp.Add(rg.Point3d(pt.X/SCALE, pt.Y/SCALE, 0))
@@ -331,8 +403,8 @@ else:
         counts = []
         for k in range(NB):
             counts.append(str(bands.Branch(GH_Path(k)).Count))
-        info = '%d bands (darkest first): %s curves | grid %dx%d, %d segments | levels %.2f-%.2f' % (
-            NB, '/'.join(counts), nx, ny, nseg, lo, hi)
+        info = '%d bands (darkest first): %s curves | grid %dx%d, blur %.1fmm (%d cells), min area %.1fmm2 | levels %.2f-%.2f' % (
+            NB, '/'.join(counts), nx, ny, SMOOTH, rad, MINA, lo, hi)
         if clipped:
             info += ' | GRID CAPPED at %d - raise `detail` for a coarser but faster pass' % CAP
         if n_open:
