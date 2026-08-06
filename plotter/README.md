@@ -350,33 +350,25 @@ into the same slot draws the line twice.
 
 ![fills](screenshots/canvas/fills.png)
 
-Nine ways to fill a closed region:
+Nine ways to fill a closed region. Each sample below is that fill run on an
+80 mm square at default settings.
 
-| Fill | Character |
-|---|---|
-| HATCH | parallel lines or concentric insets (Clipper2) |
-| HILBERT | space-filling curve, one continuous stroke |
-| FLOW FIELD | evenly-spaced streamlines through a noise field (Jobard–Lefebvre) |
-| SERPENTINE | scanlines snaked together, pen never lifts |
-| TRUCHET | random arc/diagonal tiles chained into loops |
-| STIPPLE / TSP | blue-noise dots, or one continuous tour through them |
-| DIFFERENTIAL GROWTH | self-repelling loop folded into coral forms |
-| CONTOUR | noise terrain sliced into topographic iso-lines |
-| PAW PRINTS | scattered cat-paw motifs, rotated and size-varied |
+| Fill | Character | |
+|---|---|---|
+| HATCH | parallel lines or concentric insets (Clipper2) | <img src="screenshots/fills/hatch.png" width="150"> |
+| HILBERT | space-filling curve, one continuous stroke | <img src="screenshots/fills/hilbert.png" width="150"> |
+| FLOW FIELD | evenly-spaced streamlines through a noise field (Jobard–Lefebvre) | <img src="screenshots/fills/flowfield.png" width="150"> |
+| SERPENTINE | scanlines snaked together, pen never lifts | <img src="screenshots/fills/serpentine.png" width="150"> |
+| TRUCHET | random arc/diagonal tiles chained into loops | <img src="screenshots/fills/truchet.png" width="150"> |
+| STIPPLE / TSP | blue-noise dots, or one continuous tour through them | <img src="screenshots/fills/stipple.png" width="150"> |
+| DIFFERENTIAL GROWTH | self-repelling loop folded into coral forms | <img src="screenshots/fills/growth.png" width="150"> |
+| CONTOUR | noise terrain sliced into topographic iso-lines | <img src="screenshots/fills/contour.png" width="150"> |
+| PAW PRINTS | scattered cat-paw motifs, rotated and size-varied | <img src="screenshots/fills/pawfill.png" width="150"> |
 
-#### Paw prints
-
-A motif fill rather than a line fill. Instead of covering the region with
-strokes it tiles it with one repeated shape: a heel pad and four toes, five
-closed curves per paw. `fill` above zero adds concentric insets inside each pad,
-darkening it toward the solid look of printed paw artwork. Left at zero it draws
-outlines only.
-
-Paws sit on a staggered grid with jitter rather than being scattered randomly,
-and any paw that doesn't fit entirely inside the region gets dropped instead of
-clipped. `seed` changes the arrangement, and the same seed always gives the same
-one, so a plot you're halfway through drawing doesn't move when something
-upstream changes.
+Most take an `inset` to hold the fill off the region edge, a `keep_edge` toggle
+to draw the boundary as well, and a `seed` where the pattern is random. Same
+seed gives the same result every time, so a plot you're halfway through drawing
+doesn't move when something upstream changes.
 
 ![fill patterns](screenshots/fill_patterns.png)
 ![fill patterns 2](screenshots/fill_patterns2.png)
