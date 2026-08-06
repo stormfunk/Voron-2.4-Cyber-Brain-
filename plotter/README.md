@@ -19,7 +19,7 @@ diameters on the same axis.
 
 ![assembled pen-plotter mount](hardware/pen_mount/images/assembled-axo.png)
 
-### How the mechanism works
+### Mechanism
 
 1. **Archetype interface.** The purple rear bracket shows the current archetype hotend mount I'm using (Mjolnir configuration with Rapido Ultra UHF)
 2. **Linear guidance.** The 50 mm MGN9 rail and MGN9H carriage are the same
@@ -39,7 +39,7 @@ diameters on the same axis.
 The pen tip is roughly **52 mm in front of the nozzle datum**. The Grasshopper model
 stays in pen coordinates; that fixed hardware offset is applied only when
 G-code is emitted. The spring preload also explains why travel hop must exceed
-the commanded compression—otherwise the pen never fully clears the paper.
+the commanded compression. Otherwise the pen never fully clears the paper.
 
 ![exploded axonometric view](hardware/pen_mount/images/exploded-axo-front.png)
 
@@ -50,14 +50,14 @@ the commanded compression—otherwise the pen never fully clears the paper.
 
 ### Bill of materials
 
-> **Complete download:** [Pen Holder QR V3 — Collet Update](https://github.com/stormfunk/Voron-2.4-Cyber-Brain-/releases/tag/pen-holder-qr-v3.0.0)
+> **Complete download:** [Pen Holder QR V3: Collet Update](https://github.com/stormfunk/Voron-2.4-Cyber-Brain-/releases/tag/pen-holder-qr-v3.0.0)
 > contains the full printable set as one ZIP.
 
 | Qty | Part | Specification / repository file | Purpose |
 |---:|---|---|---|
 | 1 | Archetype toolhead interface | Existing Archetype mount; purple part shown above | Fixed connection to the Voron toolhead |
-| 1 | Linear rail | MGN9, 50 mm long—the rail used by the Voron TAP nozzle-levelling design | Vertical guide |
-| 1 | Linear carriage | MGN9H—matching Voron TAP carriage | Low-play moving bearing block |
+| 1 | Linear rail | MGN9, 50 mm long, as used by the Voron TAP nozzle-levelling design | Vertical guide |
+| 1 | Linear carriage | MGN9H, matching the Voron TAP carriage | Low-play moving bearing block |
 | 2 | Compression springs | Approx. 4.4 mm OD × 25.5 mm free length in the CAD | Compliant pen preload |
 | 2 | Guide fasteners | Approx. M2.5 × 50 mm in the CAD; verify against printed holes | Spring and carrier guidance |
 | 1 pair | Neodymium magnets | Size to suit the modelled quick-release pockets (10mmx4mm)| Repeatable, tool-free carrier attachment |
@@ -96,11 +96,12 @@ radial / baked     curves in,          one pen #        ink the       fit / lock
                                             (sizes itself to the paper)  second source after PLACE
 ```
 
-Every processor shares one contract — `crvs` in, `out_crvs` out, plus an `on`
-bypass — so they chain in any order. Hatch a region, dash the result, split it
-through chromatic aberration onto separate pens, crop it to a shape.
+Every processor shares one contract: `crvs` in, `out_crvs` out, plus an `on`
+bypass. That is what lets them chain in any order. Hatch a region, dash the
+result, split it through chromatic aberration onto separate pens, crop it to a
+shape.
 
-### Conventions worth knowing
+### Conventions
 
 - **Everything is pen-space.** The whole pipeline works in physical *ink*
   positions. The pen sits **51.9 mm in front of the nozzle**; that offset is
@@ -109,7 +110,7 @@ through chromatic aberration onto separate pens, crop it to a shape.
 - **Z is the pressure channel.** A curve's Z coordinate is a pressure offset in
   mm (spring pen mount, negative = press harder), emitted only when it changes.
   Because pressure rides on the geometry it survives resampling, PLACE's fit
-  scaling and chaining — so stacked PRESSURE blocks *add*. `pressure_gain` on
+  scaling and chaining, so stacked PRESSURE blocks *add*. `pressure_gain` on
   GCODE scales the whole channel at emission (0 = plot flat) without re-running
   anything upstream.
 - **Pen palette (also the pass order):**
@@ -120,10 +121,16 @@ through chromatic aberration onto separate pens, crop it to a shape.
   | 2 | BLACK BOLD | 0.7 mm |
   | 3 | BLACK ROLLER | 0.8 mm |
   | 4 | RED FINE | 0.3 mm |
-  | 5–8 | CUSTOM 1–4 | — |
+  | 5–8 | CUSTOM 1–4 | set per pen |
 
   Widths live in `pen_widths.json` and do real work: they set THINOUT's culling
   distance per pen and drive the viewport preview lineweight.
+
+- **Switching a processor on and off.** Most have a boolean toggle beside them,
+  because their bypass passes curves straight *through*. Disabling such a node
+  emits nothing at all and breaks the chain rather than stepping out of it. The
+  ones that produce nothing when off (TITLEBLOCK, PAPERCAM, SEPARATE, SVGIN,
+  FRAME) have no toggle: enable or disable the node itself.
 
 ---
 
@@ -138,53 +145,53 @@ titleblock, placement), then G-code emission, then the preview and pen legend.
 Every group is captured below at full resolution, rendered straight off the
 canvas rather than screengrabbed.
 
-### Paper registration — teaching the machine where the sheet is
+### Paper registration
 
 ![paper registration](screenshots/canvas/paper_registration.png)
 
 Jog the pen to three corners of the sheet and press the buttons. Klipper stores
 the corners in `save_variables`; the buttons pull the result straight back into
 Grasshopper so the paper outline updates live in the viewport as each corner
-lands. This handles a **skewed** sheet — the paper frame is derived from the
+lands. This handles a **skewed** sheet. The paper frame is derived from the
 three points, so artwork is rotated to match rather than assuming square.
 
-The jog buttons are laid out as a cross, oriented as you look down at the bed —
-Y+ away from you, X+ to the right, `home` in the middle — so you press the
-direction you want the head to move rather than reading a label. The TEACH
-buttons sit in the same relation as the corners they teach: back-left above
-front-left, front-right to its right. Same geometry for the pen trim buttons.
-It is worth keeping this arrangement; a socket-ordered column is tidier on
-paper and materially worse to actually use.
+The jog buttons are laid out as a cross, oriented as you look down at the bed:
+Y+ away from you, X+ to the right, `home` in the middle. You press the direction
+you want the head to move rather than reading a label. The TEACH buttons sit in
+the same relation as the corners they teach: back-left above front-left,
+front-right to its right. Same geometry for the pen trim buttons. It is worth
+keeping this arrangement; a socket-ordered column is tidier on paper and
+materially worse to actually use.
 
-### Optical registration — finding the sheet with the bed camera
+### Optical registration
 
 ![papercam](screenshots/canvas/papercam.png)
 
 > **Status: parked.** It calibrates to 0.34 mm (leave-one-out, all 9 marks) and
-> finds the sheet reliably, but it is not in the working flow — use the manual
+> finds the sheet reliably, but it is not in the working flow. Use the manual
 > three-corner registration above. Parked deliberately after the last bug below
 > cost more time than the feature was returning. Everything here works; it is
 > the effort-to-benefit that stalled, not the maths.
 >
 > **A 3×3 grid is symmetric under reflection**, so a mirrored homography fits
-> the marks *exactly as well* as the true one — both to 0.33 mm. No residual can
+> the marks *exactly as well* as the true one, both to 0.33 mm. No residual can
 > detect it, and neither can any check made against the marks themselves. The X
 > axis was mirrored for days: the marks looked perfect throughout while anything
 > measured off the camera came back with the wrong-sign skew, so a border built
 > to match the sheet was rotated by **twice** its skew. The fix is in
-> `grid_match` and is verified the only way it can be — command the toolhead to
+> `grid_match` and is verified the only way it can be: command the toolhead to
 > a known bed coordinate and photograph where it lands. **Re-verify that way
 > after any change to camera mounting or orientation.**
 >
 > Two other things worth keeping: judge lighting by how many marks survive
 > detection, never by frame brightness (auto-exposure holds the mean constant
-> while the glare changes completely — one controlled source, chamber strip on,
-> room light off); and pinning the camera exposure via crowsnest does not work,
-> because it applies v4l2 controls before ustreamer opens the device and the
-> driver resets them on format set.
+> while the glare changes completely, so use one controlled source, chamber
+> strip on, room light off); and pinning the camera exposure via crowsnest does
+> not work, because it applies v4l2 controls before ustreamer opens the device
+> and the driver resets them on format set.
 
 The same three corners, without jogging to them. The camera is fixed and the bed
-is flat, so image → bed is exactly a **homography** — a plane-to-plane projective
+is flat, so image → bed is exactly a **homography**, a plane-to-plane projective
 map with 8 degrees of freedom, which absorbs the camera's tilt, offset and lens
 scale into one 3×3 matrix. That is what lets a single calibration keep working:
 crowsnest has autofocus off (`focus_absolute=2`), so the geometry doesn't drift
@@ -198,13 +205,13 @@ solves.
 Drawing the marks rather than sticking them on and measuring them is the whole
 point: the machine already knows precisely where it put the pen, so the
 coordinates are exact by construction, and the result maps the camera to
-**machine coordinates** — where the toolhead actually goes — rather than to the
+**machine coordinates**, where the toolhead actually goes, rather than to the
 bed as an object. It has to be drawn marks rather than the pen tip itself,
 because from overhead the toolhead hides its own tip.
 
 With more than four marks the fit is over-determined, so the **residual per mark
-becomes a real measurement** — of lens distortion, of the camera having shifted,
-of a mark drawn badly — instead of the meaningless zero that four points always
+becomes a real measurement** of lens distortion, of the camera having shifted,
+or of a mark drawn badly, instead of the meaningless zero that four points always
 produce. On a synthetic frame through a keystoned, 180°-flipped camera: 9/9
 marks matched, residual mean 0.064 mm, worst 0.128 mm.
 
@@ -213,7 +220,7 @@ The marks are placed within X 0–350 and **Y 0–292**, because the pen sits
 the pen reaches about Y298; 292 is kept as a conservative working limit.
 
 **A flipped camera needs no correction.** A homography is projective, so it
-absorbs 180° rotation (and any other) completely — the correspondence step finds
+absorbs 180° rotation (and any other) completely. The correspondence step finds
 the grid corners regardless of orientation. Rotating in software is purely for
 your own comfort in Mainsail, and if you want it, do it *before* calibrating:
 any change to the camera invalidates a stored matrix.
@@ -222,7 +229,7 @@ any change to the camera invalidates a stored matrix.
 far brighter than the bed), takes the convex hull of the bright region and
 reduces it to the four points enclosing the most area. A sheet photographed at an
 angle is a general quadrilateral rather than a rectangle, so fitting a min-area
-*rectangle* would systematically clip the corners — the best-4-hull-points fit
+*rectangle* would systematically clip the corners. The best-4-hull-points fit
 keeps the true projected shape. APPLY writes them to `paper_registration.json` in
 the same shape the manual TEACH buttons produce, so nothing downstream changes.
 
@@ -240,7 +247,7 @@ the edges get fitted instead: scan across each edge, find where brightness
 actually crosses the threshold (interpolating between the straddling samples),
 least-squares fit a line through ~40 crossings per edge, and intersect
 neighbours. Sampling those scans with nearest-neighbour quantises every one to a
-whole pixel and put a hard floor at 0.63 mm — bilinear removed it.
+whole pixel and put a hard floor at 0.63 mm. Bilinear removed it.
 
 **Camera placement matters more than the algorithm.** Modelled as a pinhole
 against the 350 mm bed, 1280×720:
@@ -252,28 +259,28 @@ against the 350 mm bed, 1280×720:
 | overhead 560 mm, 60° | **yes** | **1.0×** | 0.15 mm |
 | overhead 430 mm, 78° | yes | 1.0× | 0.16 mm |
 
-A corner mount can't see the whole bed at a normal 60° FOV — you cannot register
-a sheet that is out of frame — and its scale varies 4.5× across the bed, so
-accuracy silently depends on where the paper happens to sit. Overhead gives a
-uniform ~0.15 mm everywhere. With a standard 60° webcam that needs about
+A corner mount can't see the whole bed at a normal 60° FOV, and you cannot
+register a sheet that is out of frame. Its scale also varies 4.5× across the
+bed, so accuracy silently depends on where the paper happens to sit. Overhead
+gives a uniform ~0.15 mm everywhere. With a standard 60° webcam that needs about
 **560 mm** above the bed (the limit is the short axis of a 16:9 sensor); a 78°
 wide-angle fits at ~430 mm. The capture reports the actual mm/px at each
 detected corner, so the real figure is visible rather than assumed.
 
 **An overhead camera looks straight through the gantry**, so the beam has to be
 moved before the frame is worth anything. `PLOT_CAM_PARK` (in `cam_macros.cfg`)
-sends it to the back of the bed and raises Z — and the back strip is already the
+sends it to the back of the bed and raises Z. The back strip is already the
 zone the pen cannot reach because of the 51.9 mm offset, so this costs no
 printable area. It ends in `M400`, so capture only proceeds once the move has
 actually finished rather than merely been queued.
 
 > **Untested against a real camera frame.** Everything above is verified on
-> synthetic frames through a simulated tilted camera. Thresholding a real bed —
-> lighting, the mesh texture, glare off the sheet — is exactly the part that
-> synthetic tests cannot predict, so expect the threshold and `min_area` to need
-> tuning. `debug` writes an annotated frame to `screenshots/papercam_debug.png`
-> showing the detected quad, which is the fastest way to see what it is latching
-> onto.
+> synthetic frames through a simulated tilted camera. Thresholding a real bed,
+> with its lighting, mesh texture and glare off the sheet, is exactly the part
+> that synthetic tests cannot predict, so expect the threshold and `min_area` to
+> need tuning. `debug` writes an annotated frame to
+> `screenshots/papercam_debug.png` showing the detected quad, which is the
+> fastest way to see what it is latching onto.
 
 PULL now lives on the registration console itself rather than in a component of
 its own. Teaching a corner already re-reads the printer so the paper outline
@@ -286,7 +293,7 @@ of the 51.9 mm offset) is drawn as a red hatched exclusion zone.
 
 ![exclusion zone](screenshots/exclusion_zone.png)
 
-### Pen tool table — per-pen XYZ datums
+### Pen tool table
 
 ![pen tool table](screenshots/canvas/pen_tool_table.png)
 
@@ -297,18 +304,28 @@ calibration point, jog the tip onto the dot by hand, then STORE. `apply` loads
 that pen's offset; `table` prints what is stored; `clear` forgets one.
 
 **`commit` makes a mid-plot babystep permanent.** You are plotting, a pen sits
-slightly high, you nudge it with the live trim — and that nudge normally dies
+slightly high, you nudge it with the live trim, and that nudge normally dies
 with the job. Commit folds it into the pen's stored datum instead. Nothing moves
 when it runs: the live offset is left alone and the datum is changed by exactly
 the amount that makes `PEN_APPLY` reproduce it, so committing mid-pass cannot
 disturb the drawing.
 
 Pen 1 is the exception, and deliberately so. It *is* the datum every other pen
-is measured against, so a trim on pen 1 cannot be folded into the table — it
+is measured against, so a trim on pen 1 cannot be folded into the table. It
 would only re-zero itself. A pen 1 height error is a global draw-height error:
 change `pen_down_z` instead, or re-run STORE at the cal dot to move the datum.
 
-### MID-PLOT — everything you touch while the ink is wet
+Calibration runs in **raw machine space**. `PEN_CAL_POS` zeroes the live G-code
+offset before it moves, because `G0` obeys `SET_GCODE_OFFSET` and `PEN_APPLY`
+leaves one standing; it survives homing, the end of a job, and `PEN_CLEAR_CAL`.
+With an offset live, every pen "went to the dot" somewhere different, and since
+only Z can be adjusted in the collet, that XY shift was baked silently into the
+stored datum. The start height tracks the *mount*, not the machine: a mount that
+holds the pen further below the nozzle needs a higher start, or calibration
+begins several mm inside the bed and the only way to reach the dot is to jog up
+out of a crash.
+
+### Mid print controls
 
 ![mid-plot](screenshots/canvas/midplot.png)
 
@@ -317,35 +334,35 @@ together: you pause, swap the pen, nudge the new tip into line, resume. Two
 separate boxes meant a hunt across the canvas mid-plot with a pen drying in
 your hand.
 
-`PEN_PAUSE` holds for a swap and `PEN_RESUME` continues without un-retracting —
-never use Klipper's stock RESUME for a pen plot, it will un-retract into the
+`PEN_PAUSE` holds for a swap and `PEN_RESUME` continues without un-retracting.
+Never use Klipper's stock RESUME for a pen plot; it will un-retract into the
 paper. `PEN_COLLET` sends the head to the pen-fitting position.
 
 The trim half is the babystep analogue on all three axes: X/Y shift *where the
 drawing lands*, Z is pen height. Klipper accumulates the adjusts and they
 persist to the end of the plot, so the running total is reported after every
-press — a trim you cannot see is a trim you will forget you dialled in. Reset
-clears X/Y only, deliberately: zeroing Z mid-plot would lift the pen clean off
-the paper.
+press, because a trim you cannot see is a trim you will forget you dialled in.
+Reset clears X/Y only, deliberately: zeroing Z mid-plot would lift the pen clean
+off the paper.
 
 ### Pen widths
 
 ![pen widths](screenshots/canvas/pen_widths.png)
 
 Store the real line weight of each pen once. THINOUT then culls automatically at
-the right distance and the viewport draws at the right thickness — no manual
+the right distance and the viewport draws at the right thickness, with no manual
 spacing parameter to keep in sync.
 
 ![lineweight preview](screenshots/lineweight_preview.png)
 
-### Generators and the layer table
+### Generators
 
 ![generators](screenshots/canvas/generators.png)
 
-Pattern generators are just curve sources — baked Rhino curves work equally
+Pattern generators are just curve sources. Baked Rhino curves work equally
 well, and slot 1 is wired for exactly that.
 
-### BORDER / FRAME — a rule around the artwork
+### Border and frame
 
 ![frame styles](screenshots/frame_styles.png)
 
@@ -354,24 +371,24 @@ and open corners for crop marks. `rules` and `gap` give concentric lines,
 `radius` rounds them.
 
 `inset` is negative by default, which pushes the frame **outside** the artwork
-rect — a border touching the picture reads as a mistake. Positive values put it
-over the top of the image, so the component says so in its message rather than
-leaving you to wonder.
+rect, because a border touching the picture reads as a mistake. Positive values
+put it over the top of the image, so the component says so in its message rather
+than leaving you to wonder.
 
 It is drawn in **artwork space, before placement**, and that is the whole point:
 the border scales, rotates and lands with the picture. Generate a frame after
 placement and it sits in machine coordinates, so it drifts off the page the
 moment `fit to paper` or the sheet size changes.
 
-Toggled from the PLOT RECIPE check list like every other processor, and docked
-into a layer slot so it takes a pen of its own.
+It emits nothing when off, so enable or disable the node to include it, and dock
+it into a layer slot so it takes a pen of its own.
 
-### SVG import — artwork from anywhere
+### SVG import
 
 ![svg import](screenshots/canvas/svg_import.png)
 
 Point it at an `.svg` and it emits plotter curves with a pen number each, so the
-rig draws artwork from Illustrator, Inkscape, Figma or a plotter-art library —
+rig draws artwork from Illustrator, Inkscape, Figma or a plotter-art library,
 not only what Grasshopper generates.
 
 It handles the parts of SVG that describe a line: every path command including
@@ -379,19 +396,19 @@ relative forms, arcs, and the smooth/shorthand curves, plus `rect` (plain and
 rounded), `circle`, `ellipse`, `line`, `polyline` and `polygon`, with transforms
 composed down the whole element tree. Everything is flattened to polylines
 because that is what the pen draws anyway; `tol` sets how finely. Hidden
-elements and `<defs>`-style template blocks are skipped, and fills are ignored —
-a pen plotter draws outlines.
+elements and `<defs>`-style template blocks are skipped, and fills are ignored,
+because a pen plotter draws outlines.
 
 Pens come from one of three mappings:
 
 | `pen_mode` | mapping |
 |---|---|
 | ONE PEN | everything on `pen` |
-| BY LAYER | each top-level `<g>` becomes the next pen — how Illustrator and Inkscape both write layers |
+| BY LAYER | each top-level `<g>` becomes the next pen, which is how Illustrator and Inkscape both write layers |
 | BY COLOUR | each distinct colour becomes the next pen, in the order first seen |
 
 Colour falls back to `fill` when there is no `stroke`, and inherits down the
-tree — most real artwork sets its colour once on a parent group and never
+tree, since most real artwork sets its colour once on a parent group and never
 touches the paths. Only layers that actually contain geometry consume a pen
 index, so a stray `<defs>` block does not shift everything by one.
 
@@ -403,6 +420,15 @@ Six slots, each assigned a pen number (0 = off). Slots are interchangeable:
 any curves into any slot. The pen number, not the slot, decides which pass the
 linework ends up in.
 
+Every item is coerced to real geometry here and anything invalid is dropped,
+with the count reported per slot. Items arrive as GUIDs rather than curves, and
+passing those straight through for Grasshopper to resolve on the way out works
+right up until one will not resolve: a processor emitting a couple of thousand
+invalid polylines among sixteen thousand good ones used to take the whole table
+down with a null reference, naming neither the slot nor the source. This is the
+one place every processor funnels through, so the guard covers every slot and
+every generator added later.
+
 ### Processors
 
 ![line processors](screenshots/canvas/processors_line.png)
@@ -411,6 +437,15 @@ DASH, VARIABLE DASH (ink/gap driven by length or attractor proximity),
 CHROMATIC ABERRATION (splits a curve into offset colour steps across pens),
 CROP (clips to any closed shape, even-odd so nested shapes cut holes), and
 PRESSURE (writes the Z channel from curvature / proximity / image / noise).
+
+The rack sits off the main path, fed by a relay called FX IN that is
+deliberately empty, so nothing here touches a plot until you wire it yourself.
+To use one: drag a slot plug into FX IN, switch that effect on, and wire *that*
+effect's `out_crvs` into a layer slot. Wire one effect out, not several: they
+all read FX IN in parallel, so plugging two into the same slot draws the line
+twice.
+
+![fx splice](screenshots/canvas/fx_splice.png)
 
 ### Region fills
 
@@ -430,10 +465,10 @@ Nine ways to fill a closed region:
 | CONTOUR | noise terrain sliced into topographic iso-lines |
 | PAW PRINTS | scattered cat-paw motifs, rotated and size-varied |
 
-#### PAW PRINTS
+#### Paw prints
 
 A *motif* fill rather than a line fill: instead of covering the region with
-strokes it tiles it with one repeated drawn shape — a heel pad and four toes,
+strokes it tiles it with one repeated drawn shape, a heel pad and four toes,
 five closed curves per paw. `fill` above zero adds concentric insets inside
 each pad, darkening it toward the solid look of printed paw artwork; left at
 zero it draws outlines only, which is what a pen does best.
@@ -441,19 +476,19 @@ zero it draws outlines only, which is what a pen does best.
 Three decisions in it are worth knowing, because each fixes something that
 looked fine on screen and would not have plotted well:
 
-- **Staggered grid with jitter, not random scatter.** Pure random clumps — two
+- **Staggered grid with jitter, not random scatter.** Pure random clumps: two
   paws land on top of each other and leave a hole elsewhere. On paper a clump
   is not merely ugly, it is a blot where the pen re-inks the same spot. The
   grid guarantees the spacing; the jitter removes the regularity.
 - **Paws are kept whole.** A candidate is dropped unless it fits entirely
-  inside the region. Clipping at the boundary leaves recognisable fragments —
-  half a toe, a sliced pad — that read as mistakes, where a missing paw reads
+  inside the region. Clipping at the boundary leaves recognisable fragments,
+  half a toe or a sliced pad, that read as mistakes, where a missing paw reads
   as deliberate spacing.
 - **Toes are sized and spread so they never touch.** Every crossing would be a
   spot the pen inks twice.
 
 The scatter is driven by a seeded LCG rather than Python's `random`, so it does
-not re-shuffle every time something upstream changes — a plot you are halfway
+not re-shuffle every time something upstream changes. A plot you are halfway
 through drawing must not move because you nudged a slider. Change `seed` to get
 a different arrangement, and the same seed always gives the same one.
 
@@ -462,44 +497,51 @@ a different arrangement, and the same seed always gives the same one.
 
 ### Image processors
 
-#### TONE REGIONS — the bridge from photographs to the region fills
+#### Tone regions
+
+![tone regions](screenshots/canvas/tone.png)
 
 Every fill here takes closed curves and fills what is inside, while every other
 image processor turns an image straight into marks. So there was no way to
-*hatch a photograph* — the two halves of the pipeline could not meet. TONE is
-the missing link: image in, closed regions out, one set per tone band.
+*hatch a photograph*, because the two halves of the pipeline could not meet.
+TONE is the missing link: image in, closed regions out, one set per tone band.
 
 Two outputs, both useful alone:
 
-- **`out_crvs`** — every band boundary as linework. A posterised portrait in
+- **`out_crvs`**: every band boundary as linework. A posterised portrait in
   outline, drawable as it stands.
-- **`bands`** — a tree, one branch per band, **darkest first**. Feed branch 0
+- **`bands`**: a tree, one branch per band, **darkest first**. Feed branch 0
   into a tight hatch, branch 2 into a loose one, branch 3 into PAW PRINTS.
 
 Bands are cut by **difference, not nesting**. Contouring at a threshold gives
 "everything darker than L", so bands would sit inside one another and the
-darkest areas would be filled two, three, four times over — a blot on paper and
-wasted plotting time. Subtracting the next threshold down leaves bands that
-tile the region exactly once.
+darkest areas would be filled two, three, four times over, which is a blot on
+paper and wasted plotting time. Subtracting the next threshold down leaves bands
+that tile the region exactly once.
 
 Two details that matter in practice. The sampling grid is padded with a border
-of background value so **every contour closes inside the grid** — an unclosed
+of background value so **every contour closes inside the grid**. An unclosed
 chain is fine for CONTOUR, which only draws lines, but here it would be a
 region with no inside. And the image is downsampled to the grid by GDI+ rather
 than point-sampled per node: fur and hair alias badly at one sample per node,
 and doing the averaging in Python is about a million pixel reads and never
 returns.
 
+`crop` takes left, top, right and bottom as fractions of the image, measured
+from the **top-left**. Photographs almost never arrive framed the way the
+drawing wants them, and cropping outside then re-exporting loses the link
+between the canvas and the file it came from.
+
 A workable chain for a photograph: crop to a silhouette so the background does
 not generate as much contour as the subject, 4–5 bands, darkest into a tight
 hatch, mid-tones into a wider hatch at a different angle, one light band into
 paw prints, boundaries kept as pen 1 linework. Fine detail that is thinner than
-the grid — whiskers, single hairs — will not survive banding at any setting;
-draw those as curves.
+the grid, such as whiskers and single hairs, will not survive banding at any
+setting; draw those as curves.
 
 ![pointillism](screenshots/canvas/pointillism.png)
 
-POINTILLISM turns an image into dots — density, halftone or scattered, each dot
+POINTILLISM turns an image into dots: density, halftone or scattered, each dot
 spiral-filled so it reads as a solid at pen width.
 
 ![pointillism](screenshots/point_halftone.png)
@@ -508,24 +550,25 @@ spiral-filled so it reads as a solid at pen width.
 
 ASCII SHADER renders an image as drawn characters. Rather than mapping
 brightness onto a ramp (which turns edges to mush), each cell is sampled into a
-3×3 grid — a 9-component *shape vector* — and the character whose own ink
+3×3 grid, a 9-component *shape vector*, and the character whose own ink
 distribution best matches is chosen. Character vectors are measured from the
 real stroke geometry, so they stay honest if the font changes. An edge running
 bottom-left to top-right picks `/`; a horizontal one picks `=` or `_`. The
 `edge` slider trades shape-matching against pure density.
 (Technique after [alexharri.com/blog/ascii-rendering](https://alexharri.com/blog/ascii-rendering).)
 
-Cell and glyph are compared in **absolute** terms — how much ink sits in each
-region, 0–1 — with glyph coverage calibrated so the densest glyph in the set
-reads as 1.0. Normalising each cell by its own peak instead seems reasonable and
-is badly wrong: it discards how dark the cell is, so every smooth gradient
-becomes "uniformly full" and matches whichever glyph covers all nine bins.
+Cell and glyph are compared in **absolute** terms, meaning how much ink sits in
+each region on a 0–1 scale, with glyph coverage calibrated so the densest glyph
+in the set reads as 1.0. Normalising each cell by its own peak instead seems
+reasonable and is badly wrong: it discards how dark the cell is, so every smooth
+gradient becomes "uniformly full" and matches whichever glyph covers all nine
+bins.
 
 **Auto-levels** runs before matching. Luminance weights red at 0.299, so a
-saturated red field reads as ink ≈ 0.66 despite looking bright — an image like a
-red sky lands entirely at the dark end and can only reach the densest glyphs.
-The ink range actually present is stretched onto 0–1 (measured inside the
-image's own rect, so the white margin cannot drag the low end down), and the
+saturated red field reads as ink ≈ 0.66 despite looking bright, and an image
+like a red sky lands entirely at the dark end and can only reach the densest
+glyphs. The ink range actually present is stretched onto 0–1 (measured inside
+the image's own rect, so the white margin cannot drag the low end down), and the
 range used is reported in the manifest. `gamma` still applies on top.
 
 Characters with no glyph in the stroke font are dropped and named, rather than
@@ -533,7 +576,7 @@ silently drawing nothing.
 
 ![ascii compare](screenshots/ascii_compare.png)
 
-### Colour separation — one halftone pass per pen
+### Colour separation
 
 ![colour separation](screenshots/canvas/separation.png)
 
@@ -547,7 +590,7 @@ reproduces the pixel:
 
 solved per cell by coordinate descent. Each pen's coverage is then drawn as a
 halftone dot whose **area** tracks coverage, on a grid rotated to that pen's own
-screen angle — rotating the screens apart is what stops the passes forming moiré,
+screen angle. Rotating the screens apart is what stops the passes forming moiré,
 the same reason process printing uses 15°/75°/0°/45°.
 
 The inks are whatever pens you actually own: the pen legend's colour swatches
@@ -557,34 +600,34 @@ rather than pretending to be CMYK.
 ![separation proof](screenshots/separation_proof.png)
 
 Two things worth knowing. **Convergence matters more than it looks**: a near-black
-ink correlates with every other ink, so a few sweeps leave black over-assigned —
-pure red came out 23% black. Solving properly fixes it, but only if the inks stay
-in their given order. Sorting pale inks first also fixes red, and then builds
-black out of red + green instead of reaching for the black pen — more ink,
-muddier result. The solve is cached per quantised colour, which is what makes a
-converged solve affordable.
+ink correlates with every other ink, so a few sweeps leave black over-assigned,
+and pure red came out 23% black. Solving properly fixes it, but only if the inks
+stay in their given order. Sorting pale inks first also fixes red, and then
+builds black out of red + green instead of reaching for the black pen, which
+means more ink and a muddier result. The solve is cached per quantised colour,
+which is what makes a converged solve affordable.
 
 **It is ink-hungry.** A 160 × 120 mm image at a 2.2 mm screen came to 10,198
 strokes and 65 m of line across three passes. `cell`, `gamma` and `max_ink` are
-the levers — `max_ink` caps total coverage per cell so the paper doesn't
+the levers. `max_ink` caps total coverage per cell so the paper doesn't
 saturate.
 
 11,688 strokes over a 161×81 cell grid at 2 mm pitch, rendered at the real
 0.3 mm pen width so the weight is what will land on paper. The silhouette
 resolves in `o`, the sun disc behind it in `^`, and the background falls away
-through `'` to `.` — eight glyphs carrying the tonal range that a single
+through `'` to `.`, eight glyphs carrying the tonal range that a single
 character was carrying before.
 
 ![ascii eva](screenshots/ascii_eva.png)
 
-### THINOUT — dropping ink the pen cannot resolve
+### Thinout
 
 ![thinout](screenshots/canvas/thinout.png)
 
 Sits in the main flow (with a bypass). When strokes run closer together than the
 pen is wide, the second lays ink on top of the first: no visual gain, full
-plot-time cost. THINOUT walks each pen's curves — culling each pen against
-*itself* only, since a red stroke beside a black one is not redundant — and
+plot-time cost. THINOUT walks each pen's curves, culling each pen against
+*itself* only since a red stroke beside a black one is not redundant, and
 removes the portions already covered, at that pen's own stored width. Longest
 strokes are processed first so the major linework survives.
 
@@ -601,11 +644,11 @@ paper preview stays visible in every mode so curves can be oriented against it.
 
 ![layout reserved](screenshots/layout_reserved.png)
 
-#### Corner stop — a physical datum instead of a measurement
+#### Corner stop
 
 Alignment marks are scribed on the bed one inch in on both axes. Butt the
 sheet's front-left corner into them, pick the size from the **PAGE SIZE**
-dropdown, and the page frame is known outright — origin, size and orientation,
+dropdown, and the page frame is known outright: origin, size and orientation,
 with nothing taught and no camera.
 
 This is the most repeatable of the five, and the reason is that it does not
@@ -614,14 +657,14 @@ re-taught whenever the sheet moves; optical registration depends on a
 calibration that has to be redone if the camera is nudged. A scribed mark is
 just there, and it is still there after a power cycle, a paper change, or a
 week away from the machine. The tradeoff is that the sheet has to actually be
-against the stop — it trades a measurement for a physical assumption, so a
+against the stop. It trades a measurement for a physical assumption, so a
 sheet dropped roughly in place will be wrong in a way the software cannot see.
 
 The datum is a **pen-space** coordinate, unlike the taught corners. Those are
 stored as nozzle positions and have the pen offset added back when used; a
 scribed mark is a physical spot on the bed, so it is already where the ink has
 to land. Adding the offset would push the page a pen-length out. Default is
-25.4, 25.4 — wire a point into `corner` to override it.
+25.4, 25.4. Wire a point into `corner` to override it.
 
 Orientation is baked into the size choice (a landscape A4 is simply `297x210`)
 rather than being a separate rotate toggle, because a flag on top of a size is
@@ -646,19 +689,27 @@ fit. Both A3 orientations and portrait Letter do not.
 ![titleblock](screenshots/canvas/titleblock.png)
 
 A parametric MAGI-style titleblock drawn with a **single-stroke engraving font**
-(`strokefont.py`) — every glyph is drawn once, which is what a pen actually
+(`strokefont.py`), so every glyph is drawn once, which is what a pen actually
 wants. It sizes itself to the registered sheet, reserves a strip at the bottom,
 and PLACE fits the artwork into what is left. Contents are live: pen names,
 estimated duration, scale, date. Two dropdowns pick which pens draw it.
 
+Set the height explicitly rather than leaving it on auto. The same value feeds
+both the block and PLACE's bottom reserve, and `0` means two different things to
+them: to the block it means "size yourself from the text", to PLACE it means
+"reserve nothing". Left on auto the block draws itself tall while the artwork
+centres on the whole sheet as though it were not there. This cannot be
+automated, because PLACE already feeds the block its artwork, so reading the
+height back would be a cycle.
+
 ![titleblock placed](screenshots/titleblock_placed.png)
 
-### GCODE and the manifest
+### GCODE
 
 ![gcode](screenshots/canvas/gcode.png)
 
 Sampling, per-pen passes, travel ordering, welding, the signature, the bounding
-box mime, and the manifest. Read the manifest before pressing PLOT — it refuses
+box mime, and the manifest. Read the manifest before pressing PLOT. It refuses
 to run if the plot falls outside the paper or the machine.
 
 ```
@@ -674,48 +725,59 @@ pen 2: 2-opt skipped (would cost ~5.0s of solve to save ~2.9s of plotting)
 pen 4: 2-opt: 17 reversals, travel 0.53m -> 0.48m (10% less pen-up)
 ```
 
-### Preview and pen legend
+### Preview
 
 ![preview](screenshots/canvas/preview.png)
 
 PREVIEW draws the emission plan itself rather than the upstream geometry, so
 what you see is what the machine will do. The legend assigns each pen its
-viewport colour and — via the Custom Preview Lineweights — its real width, so
+viewport colour and, via the Custom Preview Lineweights, its real width, so
 a 0.8 mm roller looks like a 0.8 mm roller on screen.
+
+Pressure is drawn as line **weight** rather than colour, thin where the pen
+skims and fat where it digs in, because that is what pressure does to a line. A
+colour wash sat on top of the artwork and hid it, so the preview showed a red
+field instead of the drawing underneath. The overlay also strides across the
+whole plot rather than filling a budget in plot order, which used to draw only
+the strokes that happened to plot first: a diagonal sweep across the sheet that
+read as a skewed, broken overlay rather than an honest partial one.
 
 ![pen legend](screenshots/canvas/pen_legend.png)
 
+The 350 mm bed plate is internalised into the definition, so the canvas does not
+need the Rhino model open to show the machine.
+
 ---
 
-## Things that took a while to get right
+## Gotchas
 
 - **Adaptive bed mesh.** The plot's bounding box is emitted as an
   `EXCLUDE_OBJECT_DEFINE` polygon before `BED_MESH_CALIBRATE ADAPTIVE=1`, so
-  KAMP probes only the paper — not the whole 350 mm bed.
+  KAMP probes only the paper, not the whole 350 mm bed.
 - **Conditional homing/QGL.** `PLOT_HOME_QGL` skips both if they have already
   run, so a pen swap does not re-level.
 - **Welding.** Curves that are separate objects in Rhino but touch end-to-end
   were causing a pen lift per segment. Ends within `weld` distance are merged
   into one stroke.
 - **Travel ordering is spatially indexed.** Greedy nearest-end ordering scanned
-  every remaining stroke each step — O(n²). At 11,826 strokes that was ~70
-  million distance tests and **670 seconds** of solve. Endpoints now go into a
-  grid searched ring-by-ring, stopping once the ring's inner edge is further
+  every remaining stroke each step, which is O(n²). At 11,826 strokes that was
+  ~70 million distance tests and **670 seconds** of solve. Endpoints now go into
+  a grid searched ring-by-ring, stopping once the ring's inner edge is further
   than the best candidate found: **10.7 s**, identical result (travel 24.8 m →
   11.6 m either way).
 - **2-opt only runs where it pays.** After greedy, reversing a run of strokes
-  can shorten the route further — and because reversing a run also flips each
+  can shorten the route further, and because reversing a run also flips each
   stroke's direction, every link *inside* it keeps its length, so a move costs
   only its two boundary links. But greedy already takes the nearest free
   endpoint, so on tightly packed work there is nothing left: measured on 2,284
   glyph strokes (median link 0.97 mm) it bought 5.5% for 5 s of solve to save
-  1.6 s of plotting — a net loss. On 286 sparse strokes (median link 2.91 mm)
+  1.6 s of plotting, a net loss. On 286 sparse strokes (median link 2.91 mm)
   it bought 14.6% for 0.5 s. So it estimates the payoff first and skips itself
   when the arithmetic doesn't work, reporting either way in the manifest.
   Splitting passes per pen helps here: each pass is sparser than the whole job,
   so a dense pass gets skipped while sparse ones see 10–36%.
 - **`Curve.LengthParameter` costs ~680 µs a call.** It solves for arc length
-  every time. VARDASH asked for it ~10,000 times per solve — 7 of its 11.6
+  every time. VARDASH asked for it ~10,000 times per solve, 7 of its 11.6
   seconds. Each curve is now sampled once into an arc-length table and looked up
   by binary search: **11.6 s → 0.4 s**, with Z interpolated so the pressure
   channel survives untouched.
@@ -728,8 +790,12 @@ a 0.8 mm roller looks like a 0.8 mm roller on screen.
 - **Small closed curves plotted as triangles.** `DivideByLength` collapsed them
   to three points. There is now a segment-count floor for short/closed curves.
 - **The pen offset was measured, not assumed.** A 4-point bed measurement found
-  the real offset was 10 mm off nominal — every plot before that was wrong by
+  the real offset was 10 mm off nominal, so every plot before that was wrong by
   10 mm. Re-measure after any toolhead change.
+- **A locked solver looks exactly like a broken canvas.** Grasshopper's
+  `EnableSolutions` is global and survives reloading the file, so a definition
+  that has stopped updating with no errors anywhere is worth checking against
+  the padlock before anything else.
 
 ---
 
@@ -753,12 +819,15 @@ next time they solve.
 | `nodes/place_component.py` | PLACE: art → paper mapping, FIT/1:1, LOCK, DIRECT bypass |
 | `nodes/gcode_component.py` | GCODE: sampling, passes, ordering, welding, manifest, emission |
 | `nodes/preview_component.py` | PREVIEW: display shell (plan geometry drawn raw) |
+| `nodes/layers_component.py` | LAYER TABLE: six slots to pens, with invalid-curve guard |
 | `nodes/thinout_component.py` | THINOUT: per-pen culling of unresolvable linework |
 | `nodes/titleblock_component.py` | TITLEBLOCK: parametric block, auto-sized to the sheet |
-| `nodes/paperreg_component.py` | PAPER REGISTRATION: teach/pull the three corners |
+| `nodes/frame_component.py` | BORDER / FRAME: tunable rule around the artwork |
+| `nodes/paperreg_component.py` | PAPER REGISTRATION: teach and pull the three corners |
 | `nodes/pencal_component.py` | PEN TOOL TABLE: per-pen XYZ datums |
-| `nodes/pentrim_component.py` | PEN TRIM: live X/Y/Z nudges mid-plot |
+| `nodes/midplot_component.py` | MID-PLOT: pause/resume/collet plus live X/Y/Z trim |
 | `nodes/penwidth_component.py` | PEN WIDTHS: line weight per pen |
+| `nodes/pentaps_component.py` | PEN TAPS: point source picker and pen assignment for dots |
 | `nodes/centre_component.py` | CENTRE: recentre artwork on the sheet |
 | `nodes/crop_component.py` | CROP: clip to closed shapes, even-odd |
 | `nodes/dash_component.py` | DASH (also the template for new processor blocks) |
@@ -784,7 +853,7 @@ next time they solve.
 | `nodes/plotter_ghpython.py` | The original single-component version, kept for reference |
 | `camera_calibration.json` | Stored image→bed homography (written by CALIBRATE) |
 | `cam_macros.cfg` | Camera park / probe guard / capture lighting macros |
-| `pen_commit_macros.cfg` | `PEN_COMMIT` / `PEN_TWEAK` — append to the printer's `pen_macros.cfg` |
+| `pen_commit_macros.cfg` | `PEN_COMMIT` / `PEN_TWEAK`, to append to the printer's `pen_macros.cfg` |
 | `pen_widths.json` | Line weight per pen |
 | `paper_registration.json` | Last taught paper corners (also on the printer) |
 | `titleblock_brief.md` | Design brief the titleblock SVG was generated from |
@@ -797,7 +866,7 @@ next time they solve.
 The thing all of the above actually drives. STLs are in
 [`hardware/pen_mount/`](hardware/pen_mount).
 
-It is **specific to the Archetype toolhead** — it is not a general-purpose
+It is **specific to the Archetype toolhead**. It is not a general-purpose
 adapter, and it will not fit a stock Stealthburner or a Dragon Burner without
 rework. It mounts in place of the extruder.
 
@@ -805,7 +874,7 @@ rework. It mounts in place of the extruder.
 change is a pull and a push rather than screws. This matters more than it
 sounds: a plot with four pens stops four times, and any fastener that needs a
 tool turns each of those pauses into a chance to nudge the machine. The
-tradeoff is that the mount is only as repeatable as the magnets seat it — see
+tradeoff is that the mount is only as repeatable as the magnets seat it. See
 the note on datums below.
 
 **Linear bearing from the Voron TAP system.** The carriage rides the same rail
@@ -823,23 +892,23 @@ The spring is the reason for the `preload` parameter in the GCODE component:
 at draw height the tip is pressed roughly 1 mm into the paper by spring
 compression. **Travel hop must exceed the preload**, or the pen never actually
 leaves the page. Running a 1.5 mm hop against 1.01 mm of preload leaves ~0.5 mm
-of real clearance, and the pen drags a visible line through every travel move —
-which is exactly what happened, and it corrupted the middle column of every
+of real clearance, and the pen drags a visible line through every travel move.
+That is exactly what happened, and it corrupted the middle column of every
 camera calibration for days before it was spotted. 4 mm is a sane hop.
 
 **Self-centering collet.** The pen is gripped by a collet, so pens of different
 barrel diameters land on the same axis instead of leaning to whichever side the
 clamp pushes them. Without this, every pen change is also a lateral datum
-change, and the tool table cannot help — it stores an offset per pen, not per
-insertion.
+change, and the tool table cannot help, because it stores an offset per pen, not
+per insertion.
 
 **Frog face on top.** No function. It is a small frog. It is on top.
 
-### Datums and the mount
+### Datums
 
 The tool table stores an XYZ datum per pen, measured by touching the tip to the
 calibration dot. That corrects for pens being different lengths and sitting at
-different depths — but it stores one offset per *pen*, not per *insertion*.
+different depths, but it stores one offset per *pen*, not per *insertion*.
 Anything that changes between insertions of the same pen is not corrected, so
 the mount's job is to make re-seating repeatable enough that it does not need
 to be. Measured across a pen-out / home / QGL / pen-in cycle, the same pen
@@ -849,7 +918,12 @@ Pen 1 is the datum every other pen is measured against, so a pen 1 re-seat
 shifts everything with nothing to compensate. If absolute position matters,
 re-touch the dot after fitting pen 1.
 
-### Printing the parts
+`toolhead draw height` in GCODE must equal pen 1's stored datum. The tool table
+only ever holds *differences between pens*; the absolute question of how far the
+mount holds a pen below the nozzle lives in that one number, so a mount change
+means updating it or nothing touches the paper.
+
+### Printing
 
 The fresh V3 export uses functional filenames. For a normal build, print the
 four numbered core parts plus **`Collet Default.stl`**. The default collet is
@@ -873,17 +947,17 @@ parts. Sizes below are the measured STL bounding boxes, useful for plate layout:
 
 ---
 
-## Printer-side macros (`pen_macros.cfg` in this repo's config)
+## Printer-side macros
 
 | Macro | What |
 |---|---|
 | `PEN_PAUSE COLOR=` | Pen swap without parking; prompts for the named pen |
-| `PEN_RESUME` | Resume with no un-retract — **never use stock RESUME for pen plots** |
+| `PEN_RESUME` | Resume with no un-retract. **Never use stock RESUME for pen plots** |
 | `PEN_RESTORE_LIMITS` | Put velocity/accel limits back after a plot |
 | `PLOT_HOME_QGL` | Conditional home + QGL (skips if already done) |
 | `PAPER_SET_FL/FR/BL` | Teach a paper corner, persisted via `save_variables` |
 | `PEN_COLLET` | Move to the pen-fitting position |
-| `PEN_CAL_POS` | Move to the calibration dot (nozzle coords) |
+| `PEN_CAL_POS` | Move to the calibration dot (nozzle coords, offset zeroed first) |
 | `PEN_CALIBRATE` | Store the current position as this pen's datum |
 | `PEN_APPLY PEN=n` | Load pen n's stored offset |
 | `PEN_COMMIT PEN=n` | Fold the live trim into pen n's datum (nothing moves) |
@@ -891,7 +965,7 @@ parts. Sizes below are the measured STL bounding boxes, useful for plate layout:
 | `PEN_TABLE` | Print the stored table |
 | `PEN_CLEAR_CAL PEN=n` | Forget pen n |
 
-`PEN_COMMIT` and `PEN_TWEAK` are staged in `pen_commit_macros.cfg` — append them
+`PEN_COMMIT` and `PEN_TWEAK` are staged in `pen_commit_macros.cfg`; append them
 to `pen_macros.cfg` on the printer. They assume `PEN_APPLY` sets the offset to
 `pen_cal_N - pen_cal_1`; if it computes it differently, only the three
 `ax/ay/az` lines in `PEN_COMMIT` need to change.
@@ -911,9 +985,9 @@ to `pen_macros.cfg` on the printer. They assume `PEN_APPLY` sets the offset to
    needed, probes just the paper, then traces the plot bounding box slowly as an
    alignment check before committing ink.
 5. **Seat each pen.** It presents just off the paper edge; seat the pen to the
-   bed surface, tighten, `PEN_RESUME`. Repeat per pass — the display names the
+   bed surface, tighten, `PEN_RESUME`. Repeat per pass; the display names the
    pen to load. Pen-change dots always land outside the paper margins.
-   If a pen needs a nudge once it is drawing, trim it live — and press `commit`
+   If a pen needs a nudge once it is drawing, trim it live, then press `commit`
    so you do not have to make the same nudge next time.
 6. **End of plot** parks centred in X toward the back, steppers left on, so the
    paper can be lifted off cleanly.
@@ -923,6 +997,6 @@ to `pen_macros.cfg` on the printer. They assume `PEN_APPLY` sets the offset to
 ## History
 
 Built pair-programming with Claude over a Rhino MCP bridge (Keratin) driving the
-Grasshopper canvas programmatically — components authored, wired, laid out and
+Grasshopper canvas programmatically: components authored, wired, laid out and
 debugged in-session, alongside the Klipper macros, registration system and
 calibration procedures.
