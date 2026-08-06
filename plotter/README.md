@@ -1,10 +1,12 @@
 # Voron 2.4 Pen Plotter Pipeline
 
-A pen plotter that runs on the Voron 2.4 (350) without modifying the printer:
+This is my design for a pen plotter that uses a small linear rail, a couple of magnets, some pen springs and some old nails for very precise and repeatable multi colour pen plotting.
+It's currently setup to fit the fan mounting holes of my Voron 2.4 architype toolhead, but should fit pretty much any printer with some slight adjustment to the mounting holes.
+
 Grasshopper generates the linework, this pipeline turns it into multi-pen
 G-code, and Klipper macros handle registration, pen swaps and per-pen
-calibration. The Rhino viewport is a digital twin — the bed, the registered
-sheet of paper and the exact emission plan, drawn at the pen widths that will
+calibration. The Rhino viewport is a digital twin of the GH canvas: the bed, the registered
+sheet of paper, the exclusion sonze as a result of the offset pen and the exact emission plan, displayed at the pen widths (and even parametrically controlled pressure) that will
 actually lay the ink.
 
 ## Hardware
