@@ -432,6 +432,41 @@ a different arrangement, and the same seed always gives the same one.
 
 ### Image processors
 
+#### TONE REGIONS — the bridge from photographs to the region fills
+
+Every fill here takes closed curves and fills what is inside, while every other
+image processor turns an image straight into marks. So there was no way to
+*hatch a photograph* — the two halves of the pipeline could not meet. TONE is
+the missing link: image in, closed regions out, one set per tone band.
+
+Two outputs, both useful alone:
+
+- **`out_crvs`** — every band boundary as linework. A posterised portrait in
+  outline, drawable as it stands.
+- **`bands`** — a tree, one branch per band, **darkest first**. Feed branch 0
+  into a tight hatch, branch 2 into a loose one, branch 3 into PAW PRINTS.
+
+Bands are cut by **difference, not nesting**. Contouring at a threshold gives
+"everything darker than L", so bands would sit inside one another and the
+darkest areas would be filled two, three, four times over — a blot on paper and
+wasted plotting time. Subtracting the next threshold down leaves bands that
+tile the region exactly once.
+
+Two details that matter in practice. The sampling grid is padded with a border
+of background value so **every contour closes inside the grid** — an unclosed
+chain is fine for CONTOUR, which only draws lines, but here it would be a
+region with no inside. And the image is downsampled to the grid by GDI+ rather
+than point-sampled per node: fur and hair alias badly at one sample per node,
+and doing the averaging in Python is about a million pixel reads and never
+returns.
+
+A workable chain for a photograph: crop to a silhouette so the background does
+not generate as much contour as the subject, 4–5 bands, darkest into a tight
+hatch, mid-tones into a wider hatch at a different angle, one light band into
+paw prints, boundaries kept as pen 1 linework. Fine detail that is thinner than
+the grid — whiskers, single hairs — will not survive banding at any setting;
+draw those as curves.
+
 ![pointillism](screenshots/canvas/pointillism.png)
 
 POINTILLISM turns an image into dots — density, halftone or scattered, each dot
@@ -709,6 +744,7 @@ next time they solve.
 | `nodes/growth_component.py` | DIFFERENTIAL GROWTH |
 | `nodes/contour_component.py` | CONTOUR / iso-lines |
 | `nodes/pawfill_component.py` | PAW PRINTS: scattered cat-paw motifs, rotated and size-varied |
+| `nodes/tone_component.py` | TONE REGIONS: image → closed tone bands that feed the fills |
 | `nodes/circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
 | `nodes/pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
 | `nodes/ascii_component.py` | ASCII SHADER: image → shape-matched characters |
