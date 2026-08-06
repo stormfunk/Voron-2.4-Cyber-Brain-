@@ -708,6 +708,7 @@ next time they solve.
 | `nodes/stipple_component.py` | STIPPLE / TSP-ART |
 | `nodes/growth_component.py` | DIFFERENTIAL GROWTH |
 | `nodes/contour_component.py` | CONTOUR / iso-lines |
+| `nodes/pawfill_component.py` | PAW PRINTS: scattered cat-paw motifs, rotated and size-varied |
 | `nodes/circles_component.py` | CONCENTRIC CIRCLES (Graph Mapper spacing) |
 | `nodes/pointillism_component.py` | POINTILLISM: image → spiral-filled dots |
 | `nodes/ascii_component.py` | ASCII SHADER: image → shape-matched characters |
