@@ -12,8 +12,8 @@ actually lay the ink.
 ## Hardware
 
 The plotter is a removable pen toolhead built around the Archetype interface.
-It replaces the extruder for plotting, but does not require permanent changes
-to the Voron. A short MGN9 rail constrains the pen carrier, twin springs provide
+It replaces the hotend fan for plotting (2 screw swap), but does not require permanent changes
+to the Voron. A short MGN9 rail (leftover from a previous TAP (https://github.com/VoronDesign/Voron-Tap) constrains the pen carrier, twin springs provide
 compliant drawing pressure, and a self-centring collet keeps different pen
 diameters on the same axis.
 
@@ -21,8 +21,7 @@ diameters on the same axis.
 
 ### How the mechanism works
 
-1. **Archetype interface.** The purple rear bracket locates the complete plotter
-   on the Archetype toolhead in place of the extruder.
+1. **Archetype interface.** The purple rear bracket shows the current archetype hotend mount I'm using (Mjolnir configuration with Rapido Ultra UHF)
 2. **Linear guidance.** The 50 mm MGN9 rail and MGN9H carriage are the same
    parts used by the Voron **TAP nozzle-levelling design**. They allow only
    vertical pen motion, preventing the lateral play that would show up as
@@ -37,7 +36,7 @@ diameters on the same axis.
    swaps tool-free. The software stores a separate XYZ datum for each pen to
    correct its length and small re-seating differences.
 
-The pen tip is **51.9 mm in front of the nozzle datum** (measured against the calibration dot for the pen currently held as pen 1; 58 mm was the earlier nominal figure). The Grasshopper model
+The pen tip is roughly **52 mm in front of the nozzle datum**. The Grasshopper model
 stays in pen coordinates; that fixed hardware offset is applied only when
 G-code is emitted. The spring preload also explains why travel hop must exceed
 the commanded compression—otherwise the pen never fully clears the paper.
