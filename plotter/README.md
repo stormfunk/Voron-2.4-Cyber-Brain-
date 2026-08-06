@@ -275,7 +275,11 @@ actually finished rather than merely been queued.
 > showing the detected quad, which is the fastest way to see what it is latching
 > onto.
 
-![registration sync](screenshots/canvas/registration_sync.png)
+PULL now lives on the registration console itself rather than in a component of
+its own. Teaching a corner already re-reads the printer so the paper outline
+updates live, so a separate box only ever served the manual case; it emits
+`reg_json` on every solve, which means a fresh session already knows where the
+sheet is instead of needing a pull first.
 
 The area behind the paper that the pen physically cannot reach (a consequence
 of the 51.9 mm offset) is drawn as a red hatched exclusion zone.
@@ -304,21 +308,25 @@ is measured against, so a trim on pen 1 cannot be folded into the table — it
 would only re-zero itself. A pen 1 height error is a global draw-height error:
 change `pen_down_z` instead, or re-run STORE at the cal dot to move the datum.
 
-### Pen control — pausing between passes
+### MID-PLOT — everything you touch while the ink is wet
 
-![pen control](screenshots/canvas/pen_control.png)
+![mid-plot](screenshots/canvas/midplot.png)
 
-`PEN_PAUSE` holds for a pen swap and `PEN_RESUME` continues without un-retracting
-— never use Klipper's stock RESUME for a pen plot, it will un-retract into the
+Pen handling and live trim in one console, because they are always used
+together: you pause, swap the pen, nudge the new tip into line, resume. Two
+separate boxes meant a hunt across the canvas mid-plot with a pen drying in
+your hand.
+
+`PEN_PAUSE` holds for a swap and `PEN_RESUME` continues without un-retracting —
+never use Klipper's stock RESUME for a pen plot, it will un-retract into the
 paper. `PEN_COLLET` sends the head to the pen-fitting position.
 
-### Pen trim — live nudges mid-plot
-
-![pen trim](screenshots/canvas/pen_trim.png)
-
-The babystep analogue, on all three axes. X/Y shift *where the drawing lands*;
-Z is pen height. Use during a plot when a pen sits a little differently than
-when it was calibrated.
+The trim half is the babystep analogue on all three axes: X/Y shift *where the
+drawing lands*, Z is pen height. Klipper accumulates the adjusts and they
+persist to the end of the plot, so the running total is reported after every
+press — a trim you cannot see is a trim you will forget you dialled in. Reset
+clears X/Y only, deliberately: zeroing Z mid-plot would lift the pen clean off
+the paper.
 
 ### Pen widths
 

@@ -90,12 +90,17 @@ if plan_dots:
             continue
         view_dots.append(rg.Circle(rg.Point3d(p3), _dot_r).ToNurbsCurve())
 
-# ---- pressure heat overlay: pressured strokes chopped into pieces, coloured
-# by press depth (|Z|): cool grey-blue = light touch, hot red = full press.
-# Drawn ON TOP of the normal pen views via a colour-per-piece Custom Preview.
+# ---- pressure overlay: pressured strokes chopped into pieces and drawn at a
+# WIDTH set by press depth (|Z|) - thin where the pen skims, fat where it digs
+# in. Weight rather than colour because that is what pressure physically does
+# to a line: a colour wash sat on top of the artwork and hid it, so the preview
+# showed a red field instead of the drawing underneath.
+# Pixels, not mm (the Human preview takes screen thickness with Absolute=False).
 import System.Drawing as SD
 view_pressure = []
-pressure_col = []
+pressure_wt = []
+PW_MIN = 1.0        # screen px at zero press
+PW_MAX = 7.0        # screen px at full press
 _praw = []          # (piece polyline pts, avg |z|)
 _pmax = 0.0
 for _plan in [plan_pen1, plan_pen2, plan_pen3, plan_pen4, plan_pen5, plan_pen6, plan_pen7, plan_pen8]:
@@ -117,7 +122,7 @@ for _plan in [plan_pen1, plan_pen2, plan_pen3, plan_pen4, plan_pen5, plan_pen6, 
             continue
         CH = 8
         i0 = 0
-        while i0 < pl.Count - 1 and len(_praw) < 6000:
+        while i0 < pl.Count - 1:
             i1 = i0 + CH
             if i1 > pl.Count - 1:
                 i1 = pl.Count - 1
@@ -129,18 +134,26 @@ for _plan in [plan_pen1, plan_pen2, plan_pen3, plan_pen4, plan_pen5, plan_pen6, 
                 _pmax = za
             _praw.append((i0, i1, pl, za))
             i0 = i1
+PCAP = 6000
 if _praw and _pmax > 0.001:
-    for item in _praw:
+    # Sample EVENLY across the whole drawing. This used to stop collecting once
+    # the budget was full, which took pieces in PLOT ORDER - so on a job with
+    # more strokes than budget you saw only the ones that happened to plot
+    # first: a diagonal slice sweeping across the sheet, which reads as a
+    # skewed, broken overlay rather than an honest partial one. A stride keeps
+    # the same budget and represents the whole drawing.
+    _stride = 1
+    if len(_praw) > PCAP:
+        _stride = int(len(_praw) / PCAP) + 1
+    for _ix in range(0, len(_praw), _stride):
+        item = _praw[_ix]
         lp = List[rg.Point3d]()
         for k in range(item[0], item[1] + 1):
             q = item[2][k]
             lp.Add(rg.Point3d(q.X, q.Y, 0.05))
         view_pressure.append(rg.PolylineCurve(lp))
         t = item[3] / _pmax
-        r = int(120 + 120 * t)
-        g = int(140 - 110 * t)
-        b = int(200 - 170 * t)
-        pressure_col.append(SD.Color.FromArgb(235, r, g, b))
+        pressure_wt.append(PW_MIN + (PW_MAX - PW_MIN) * t)
 
 bed = [rg.Rectangle3d(rg.Plane.WorldXY, rg.Interval(0, BED), rg.Interval(0, BED)).ToNurbsCurve()]
 paper = []; labels = []
@@ -148,10 +161,7 @@ paper = []; labels = []
 # ---- unreachable zone: the pen sits OFFY in front of the nozzle, so when the
 # nozzle hits its Y limit the pen still stops short - that back strip can never
 # be drawn on. Shown as a diagonally hatched red band.
-# MUST match GCODE and PLACE. Left at the old nominal 58.0 when those were
-# re-measured to 51.9 against the calibration dot, so the band was drawn 6.1mm
-# deeper than the pen actually loses - i.e. it warned about reachable bed.
-OFFY_HW = -51.9                     # pen offset from nozzle (hardware constant)
+OFFY_HW = -58.0                     # pen offset from nozzle (hardware constant)
 view_exclusion = []
 _ylim = BED + OFFY_HW               # highest Y the PEN can reach
 if _ylim < BED - 0.5:
