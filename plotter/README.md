@@ -66,8 +66,8 @@ fully clears the paper.
 | 1 | Moving carriage body | [`02_Linear Rail Carriage.stl`](hardware/pen_mount/02_Linear%20Rail%20Carriage.stl) | Spring-loaded carrier body |
 | 1 | Collet holder | [`03_Collet Holder.stl`](hardware/pen_mount/03_Collet%20Holder.stl) | Threaded housing for the collet system |
 | 1 | Collet lock nut | [`04_Collet Lock Nut.stl`](hardware/pen_mount/04_Collet%20Lock%20Nut.stl) | Closes and locks the collet |
-| 1 | Default collet | [`Collet Default.stl`](hardware/pen_mount/Collet%20Default.stl) | **Recommended starting point; designed to fit most pens** |
-| Optional | Sized collet | [5 mm](hardware/pen_mount/Collet%205mm.stl), [7 mm](hardware/pen_mount/Collet%207mm.stl), [9 mm](hardware/pen_mount/Collet%209mm.stl), [11 mm](hardware/pen_mount/Collet%2011mm.stl), [13 mm](hardware/pen_mount/Collet%2013mm.stl), or [15 mm](hardware/pen_mount/Collet%2015mm.stl) | Optional alternatives for a known pen-barrel diameter; print only the size required |
+| 1 | Default collet | [`Collet Default.stl`](hardware/pen_mount/Collet%20Default.stl) | **Start here. Fits most pens** |
+| Optional | Sized collet | [5 mm](hardware/pen_mount/Collet%205mm.stl), [7 mm](hardware/pen_mount/Collet%207mm.stl), [9 mm](hardware/pen_mount/Collet%209mm.stl), [11 mm](hardware/pen_mount/Collet%2011mm.stl), [13 mm](hardware/pen_mount/Collet%2013mm.stl), or [15 mm](hardware/pen_mount/Collet%2015mm.stl) | For a known barrel diameter. Print only the size you need |
 | 1 | Pen or marker | Use the default collet first; switch to a labelled size only when needed | Drawing cool shit |
 
 The spring, magnet and fastener dimensions above reflect the current CAD. Check
@@ -96,23 +96,21 @@ radial / baked     curves in,          one pen #        ink the       fit / lock
                                             (sizes itself to the paper)  second source after PLACE
 ```
 
-Every processor shares one contract: `crvs` in, `out_crvs` out, plus an `on`
-bypass. That is what lets them chain in any order. Hatch a region, dash the
-result, split it through chromatic aberration onto separate pens, crop it to a
-shape.
+Every processor takes `crvs` and returns `out_crvs`, with an `on` bypass. Same
+shape every time, so they chain in any order. Hatch a region, dash the result,
+split it through chromatic aberration onto separate pens, crop it to a shape.
 
 ### Conventions
 
-- **Everything is pen-space.** The whole pipeline works in physical *ink*
-  positions. The pen sits **51.9 mm in front of the nozzle**; that offset is
-  applied only when G-code text is written. Nothing upstream ever thinks about
-  the nozzle.
-- **Z is the pressure channel.** A curve's Z coordinate is a pressure offset in
-  mm (spring pen mount, negative = press harder), emitted only when it changes.
-  Pressure rides on the geometry, so it survives resampling, PLACE's fit scaling
-  and chaining, and stacked PRESSURE blocks *add*. `pressure_gain` on GCODE
-  scales the whole channel at emission (0 = plot flat) without re-running
-  anything upstream.
+- **Everything is pen-space.** The pipeline works in physical *ink* positions
+  throughout. The pen sits **51.9 mm in front of the nozzle**, and that offset
+  only gets applied when the G-code text is written. Nothing upstream knows the
+  nozzle exists.
+- **Z is the pressure channel.** A curve's Z is a pressure offset in mm (spring
+  mount, negative presses harder), emitted only when it changes. It rides on the
+  geometry, so it survives resampling, PLACE's fit scaling and chaining, and
+  stacked PRESSURE blocks *add*. `pressure_gain` on GCODE scales the whole
+  channel at emission (0 plots flat) without re-running anything upstream.
 - **Pen palette (also the pass order):**
 
   | # | Pen | Width |
@@ -123,22 +121,24 @@ shape.
   | 4 | RED FINE | 0.3 mm |
   | 5–8 | CUSTOM 1–4 | set per pen |
 
-  Widths live in `pen_widths.json` and do real work: they set THINOUT's culling
-  distance per pen and drive the viewport preview lineweight.
+  Widths live in `pen_widths.json`. They aren't just for display: THINOUT uses
+  them as its culling distance per pen, and the viewport preview draws at that
+  thickness.
 
-- **Switching a processor on and off.** Most have a boolean toggle beside them,
-  because their bypass passes curves straight *through*. Disabling such a node
-  emits nothing at all and breaks the chain rather than stepping out of it. The
-  ones that produce nothing when off (TITLEBLOCK, PAPERCAM, SEPARATE, SVGIN,
-  FRAME) have no toggle: enable or disable the node itself.
+- **Switching a processor on and off.** Most have a boolean toggle next to them,
+  because bypassing passes the curves straight through. Disabling the node
+  instead gives you nothing at all, which breaks the chain rather than stepping
+  out of it. TITLEBLOCK, PAPERCAM, SEPARATE, SVGIN and FRAME produce nothing
+  when off anyway, so they have no toggle. Just disable those.
 
 ---
 
 ## Canvas tour
 
-The whole definition, left to right: hardware setup and pen calibration, then
-generators, then processors and region fills, then assembly (layer table,
-titleblock, placement), then G-code emission, then the preview and pen legend.
+The whole definition reads left to right: hardware setup and pen calibration
+first, then generators, processors and region fills, then assembly (layer table,
+titleblock, placement), G-code emission, and finally the preview and pen legend.
+The overview below is the whole thing at once.
 
 ![canvas overview](screenshots/canvas/overview.png)
 
@@ -146,22 +146,24 @@ titleblock, placement), then G-code emission, then the preview and pen legend.
 
 ![paper registration](screenshots/canvas/paper_registration.png)
 
-Jog the pen to three corners of the sheet and press the buttons. Klipper stores
-the corners in `save_variables` and the result is pulled straight back into
-Grasshopper, so the paper outline updates live in the viewport as each corner
-lands. Three points handle a **skewed** sheet: the paper frame is derived from
-them, so artwork is rotated to match rather than assuming square.
+Jog the pen to three corners of the sheet and press the buttons. Klipper keeps
+the corners in `save_variables` and they get pulled straight back into
+Grasshopper, so the paper outline updates in the viewport as each corner lands.
+
+Three points rather than two, because that handles a skewed sheet. The frame is
+built from the points, so artwork rotates to match instead of assuming the paper
+is square to the bed.
 
 The jog buttons are laid out as a cross, oriented as you look down at the bed:
-Y+ away from you, X+ to the right, `home` in the middle. The TEACH buttons sit
-in the same relation as the corners they teach.
+Y+ away from you, X+ to the right, `home` in the middle. TEACH buttons sit in
+the same relation as the corners they teach.
 
-PULL lives on the console itself. Teaching a corner already re-reads the
-printer, and `reg_json` is emitted on every solve, so a fresh session already
-knows where the sheet is.
+PULL is on the console rather than a separate component. Teaching a corner
+re-reads the printer anyway, and `reg_json` comes out on every solve, so a fresh
+session already knows where the sheet is.
 
-The area behind the paper that the pen cannot reach (a consequence of the
-51.9 mm offset) is drawn as a red hatched exclusion zone.
+The strip behind the paper that the pen can't reach, thanks to the 51.9 mm
+offset, is drawn as a red hatched exclusion zone.
 
 ![exclusion zone](screenshots/exclusion_zone.png)
 
@@ -173,99 +175,96 @@ The area behind the paper that the pen cannot reach (a consequence of the
 > it is not in the working flow. Use the manual three-corner registration above.
 
 Finds the same three corners with a bed camera instead of jogging to them. The
-camera is fixed and the bed is flat, so image → bed is a **homography**, which
-absorbs the camera's tilt, offset and lens scale into one 3×3 matrix.
+camera is fixed and the bed is flat, so image → bed is a homography, and one 3×3
+matrix soaks up the camera's tilt, offset and lens scale.
 
 **Calibrate once.** `target_crvs` emits a grid of discs at known machine
-coordinates; plot them in DIRECT placement so they land exactly where commanded,
-then press CALIBRATE. Because the machine drew them itself, the coordinates are
-exact by construction and the result maps the camera to machine coordinates.
-Marks are placed within X 0–350 and **Y 0–292**, since the pen cannot reach the
-back strip.
+coordinates. Plot them in DIRECT placement so they land exactly where commanded,
+then hit CALIBRATE. The machine drew them, so it already knows precisely where
+they are, and the result maps the camera to machine coordinates. Marks stay
+within X 0–350 and Y 0–292, since the pen can't reach the back strip.
 
-Use more than four marks. The fit is then over-determined, so the residual per
-mark is a real measure of lens distortion or a shifted camera rather than the
-zero that four points always give.
+Use more than four marks. Four always fits perfectly, which tells you nothing.
+With more, the residual per mark actually means something, like lens distortion
+or the camera having been knocked.
 
-A flipped or rotated camera needs no correction, but any change to camera
-mounting or orientation invalidates a stored matrix, so recalibrate after one.
-Autofocus must be off (`focus_absolute=2`) or the geometry drifts between
-sessions.
+A flipped or rotated camera needs no correction, but moving the camera at all
+invalidates a stored matrix, so recalibrate after you do. Autofocus has to be
+off (`focus_absolute=2`) or the geometry drifts between sessions.
 
 **Then per sheet:** CAPTURE grabs a frame, thresholds it by Otsu (paper is far
 brighter than the bed), and fits lines to the four paper edges. APPLY writes the
 corners to `paper_registration.json` in the same shape the manual TEACH buttons
 produce, so nothing downstream changes.
 
-**Mount the camera overhead, not in a corner.** A corner mount cannot see the
+**Mount the camera overhead, not in a corner.** A corner mount can't see the
 whole bed at a normal 60° field of view, and its scale varies about 4.5× across
-the bed. Overhead gives a uniform ~0.15 mm anywhere on the bed: a standard 60°
-webcam needs about **560 mm** above it, a 78° wide-angle about **430 mm**. The
-capture reports actual mm/px at each detected corner.
+the bed. Overhead gives a uniform ~0.15 mm anywhere. A standard 60° webcam needs
+about 560 mm above the bed, a 78° wide-angle about 430 mm. Capture reports the
+actual mm/px at each corner it finds.
 
 An overhead camera looks straight through the gantry, so `PLOT_CAM_PARK` (in
-`cam_macros.cfg`) moves the beam to the back of the bed and raises Z before
-capture. That strip is already unreachable by the pen, so it costs no printable
-area.
+`cam_macros.cfg`) moves the beam to the back and raises Z before capture. The
+pen can't reach that strip anyway, so it costs no printable area.
 
 Judge lighting by how many marks survive detection, not by how bright the frame
-looks: auto-exposure holds the mean constant while glare changes completely. One
-controlled source works best, chamber strip on and room light off. Pinning the
-exposure through crowsnest does not work, because it applies v4l2 controls
-before ustreamer opens the device and the driver resets them on format set.
+looks. Auto-exposure holds the mean constant while the glare changes completely.
+One controlled source works best, chamber strip on and room light off. Pinning
+exposure through crowsnest doesn't work: it applies v4l2 controls before
+ustreamer opens the device, and the driver resets them on format set.
 
-`debug` writes an annotated frame to `screenshots/papercam_debug.png` showing
-the detected quad, which is the fastest way to see what it is latching onto.
-Expect the threshold and `min_area` to need tuning against a real bed.
+`debug` writes an annotated frame to `screenshots/papercam_debug.png` with the
+detected quad drawn on it, which is the quickest way to see what it's latching
+onto. Expect to tune the threshold and `min_area` against a real bed.
 
 ### Pen tool table
 
 ![pen tool table](screenshots/canvas/pen_tool_table.png)
 
-A CNC-style tool table. Each pen gets its own stored XYZ datum, **independent
-of plot order**, so swapping a fat pen for a thin one does not throw the
-alignment out. The flow is: fit the pen at the collet position, go to the
-calibration point, jog the tip onto the dot by hand, then STORE. `apply` loads
-that pen's offset; `table` prints what is stored; `clear` forgets one.
+A CNC-style tool table. Each pen has its own stored XYZ datum, independent of
+plot order, so swapping a fat pen for a thin one doesn't throw the alignment
+out. Fit the pen at the collet position, go to the calibration point, jog the
+tip onto the dot by hand, then STORE. `apply` loads that pen's offset, `table`
+prints what's stored, `clear` forgets one.
 
 **`commit` makes a mid-plot babystep permanent.** Nudge a pen with the live trim
-and that nudge normally dies with the job; commit folds it into the pen's stored
-datum instead. Nothing moves when it runs, so it is safe mid-pass.
+and that nudge normally dies with the job. Commit folds it into the stored datum
+instead. Nothing moves while it runs, so it's safe mid-pass.
 
-**Pen 1 is the datum** every other pen is measured against, so a trim on pen 1
-cannot be folded into the table. A pen 1 height error is a global draw-height
-error: change `pen_down_z`, or re-run STORE at the cal dot to move the datum.
+Pen 1 is the datum everything else is measured against, so a trim on pen 1 can't
+be folded back in. A pen 1 height error is really a global draw-height error:
+change `pen_down_z`, or re-run STORE at the cal dot to move the datum itself.
 
 Calibration runs in raw machine space. `PEN_CAL_POS` zeroes the live G-code
-offset before moving, because `G0` obeys `SET_GCODE_OFFSET` and one left
-standing shifts where each pen "reaches" the dot. Its start height tracks the
-mount: set `PEN_CAL_POS`'s default Z to whatever pen 1 stores, or calibration
-starts inside the bed.
+offset before it moves, since `G0` obeys `SET_GCODE_OFFSET` and one left
+standing changes where each pen "reaches" the dot. Its start height follows the
+mount, so set the default Z to whatever pen 1 ends up storing. Leave it too low
+and calibration starts inside the bed.
 
 ### Mid print controls
 
 ![mid-plot](screenshots/canvas/midplot.png)
 
-Pen handling and live trim in one console: pause, swap the pen, nudge the new
-tip into line, resume.
+Pen handling and live trim in one console, since you use them together: pause,
+swap the pen, nudge the new tip into line, resume.
 
-`PEN_PAUSE` holds for a swap and `PEN_RESUME` continues without un-retracting.
-Never use Klipper's stock RESUME for a pen plot; it will un-retract into the
-paper. `PEN_COLLET` sends the head to the pen-fitting position.
+`PEN_PAUSE` holds for a swap and `PEN_RESUME` carries on without un-retracting.
+Never use Klipper's stock RESUME for a pen plot, it'll un-retract straight into
+the paper. `PEN_COLLET` sends the head to the pen-fitting position.
 
-The trim half is the babystep analogue on all three axes: X/Y shift *where the
-drawing lands*, Z is pen height. Klipper accumulates the adjusts and they
-persist to the end of the plot, so the running total is reported after every
-press. Reset clears X/Y only: zeroing Z mid-plot would lift the pen off the
+The trim half is babystepping on all three axes. X/Y shift where the drawing
+lands, Z is pen height. Klipper accumulates the adjusts and they stick around
+until the end of the plot, so the running total gets reported after every press.
+Reset clears X/Y only, because zeroing Z mid-plot would lift the pen off the
 paper.
 
 ### Pen widths
 
 ![pen widths](screenshots/canvas/pen_widths.png)
 
-Store the real line weight of each pen once. THINOUT then culls at the right
-distance and the viewport draws at the right thickness, with no manual spacing
-parameter to keep in sync.
+Measure each pen once and store it. THINOUT culls at that distance and the
+viewport draws at that thickness, so there's no separate spacing number to keep
+in sync.
 
 ![lineweight preview](screenshots/lineweight_preview.png)
 
@@ -284,13 +283,14 @@ Four corner treatments from the same six sliders: plain, corner ticks, crosses,
 and open corners for crop marks. `rules` and `gap` give concentric lines,
 `radius` rounds them.
 
-`inset` is negative by default, which puts the frame **outside** the artwork
-rect. Positive values place it over the image, and the component says so in its
-message.
+`inset` is negative by default, which puts the frame outside the artwork rect.
+Positive values put it over the image, and the component says so in its message
+if you do that.
 
-It is drawn in **artwork space, before placement**, so the border scales,
-rotates and lands with the picture. It emits nothing when off, so enable or
-disable the node to include it, and dock it into a layer slot to give it a pen.
+It draws in artwork space, before placement, so the border scales and rotates
+with the picture and lands where it should. Nothing comes out when it's off, so
+enable or disable the node to include it, and dock it into a layer slot to give
+it a pen.
 
 ### SVG import
 
@@ -322,12 +322,12 @@ tree. Only layers that actually contain geometry consume a pen index, so a stray
 
 ![layer table](screenshots/canvas/layer_table.png)
 
-Six slots, each assigned a pen number (0 = off). Slots are interchangeable:
-any curves into any slot. The pen number, not the slot, decides which pass the
-linework ends up in.
+Six slots, each with a pen number (0 = off). The slots are interchangeable, any
+curves into any slot. It's the pen number that decides which pass the linework
+ends up in, not the slot.
 
-Invalid curves are dropped here and the count is reported per slot, so a source
-producing rubbish is visible rather than taking the table down with it.
+Invalid curves get dropped here with the count reported per slot. Easier to see
+that a source is producing junk than to have it take the whole table down.
 
 ### Processors
 
@@ -338,11 +338,11 @@ CHROMATIC ABERRATION (splits a curve into offset colour steps across pens),
 CROP (clips to any closed shape, even-odd so nested shapes cut holes), and
 PRESSURE (writes the Z channel from curvature / proximity / image / noise).
 
-The rack sits off the main path, fed by a relay called FX IN that is empty by
-default, so nothing here touches a plot until you wire it. To use one: drag a
-slot plug into FX IN, switch that effect on, and wire *that* effect's
-`out_crvs` into a layer slot. Wire one effect out, not several: they all read
-FX IN in parallel, so plugging two into the same slot draws the line twice.
+The rack sits off the main path, fed by a relay called FX IN that's empty by
+default, so nothing in here touches a plot until you wire it up. Drag a slot
+plug into FX IN, switch that effect on, then wire that effect's `out_crvs` into
+a layer slot. Wire one out, not several. They all read FX IN in parallel, so two
+into the same slot draws the line twice.
 
 ![fx splice](screenshots/canvas/fx_splice.png)
 
@@ -366,16 +366,16 @@ Nine ways to fill a closed region:
 
 #### Paw prints
 
-A *motif* fill rather than a line fill: instead of covering the region with
-strokes it tiles it with one repeated drawn shape, a heel pad and four toes,
-five closed curves per paw. `fill` above zero adds concentric insets inside
-each pad, darkening it toward the solid look of printed paw artwork; left at
-zero it draws outlines only.
+A motif fill rather than a line fill. Instead of covering the region with
+strokes it tiles it with one repeated shape: a heel pad and four toes, five
+closed curves per paw. `fill` above zero adds concentric insets inside each pad,
+darkening it toward the solid look of printed paw artwork. Left at zero it draws
+outlines only.
 
-Paws are placed on a staggered grid with jitter rather than scattered randomly,
-and a paw is dropped rather than clipped if it does not fit entirely inside the
-region. `seed` changes the arrangement and the same seed always gives the same
-one, so a plot you are halfway through drawing does not move when something
+Paws sit on a staggered grid with jitter rather than being scattered randomly,
+and any paw that doesn't fit entirely inside the region gets dropped instead of
+clipped. `seed` changes the arrangement, and the same seed always gives the same
+one, so a plot you're halfway through drawing doesn't move when something
 upstream changes.
 
 ![fill patterns](screenshots/fill_patterns.png)
@@ -387,30 +387,30 @@ upstream changes.
 
 ![tone regions](screenshots/canvas/tone.png)
 
-Image in, closed regions out, one set per tone band. This is what lets a
-photograph drive the region fills, which otherwise only accept closed curves.
+Image in, closed regions out, one set per tone band. The region fills only take
+closed curves, so this is how you get a photograph into them.
 
-Two outputs, both useful alone:
+Two outputs, both useful on their own:
 
 - **`out_crvs`**: every band boundary as linework. A posterised portrait in
   outline, drawable as it stands.
-- **`bands`**: a tree, one branch per band, **darkest first**. Feed branch 0
-  into a tight hatch, branch 2 into a loose one, branch 3 into PAW PRINTS.
+- **`bands`**: a tree, one branch per band, darkest first. Feed branch 0 into a
+  tight hatch, branch 2 into a loose one, branch 3 into PAW PRINTS.
 
-Bands are cut by difference rather than nesting, so they tile the region exactly
-once instead of stacking ink two or three deep over the darkest areas.
+Bands are cut by difference rather than nesting, so they tile the region once
+instead of stacking ink two or three deep over the dark areas.
 
 `crop` takes left, top, right and bottom as fractions of the image, measured
-from the **top-left**, so a photograph can be framed without leaving the canvas.
-`smooth` blurs before banding and `min_area` drops specks; without both, fur and
-film grain each become their own closed loop.
+from the top-left, so you can frame a photo without leaving the canvas. `smooth`
+blurs before banding and `min_area` drops specks. Skip either and fur or film
+grain turns into thousands of tiny closed loops.
 
-A workable chain for a photograph: crop to a silhouette so the background does
-not generate as much contour as the subject, 4–5 bands, darkest into a tight
+A chain that works for a photograph: crop to a silhouette so the background
+doesn't generate as much contour as the subject, 4–5 bands, darkest into a tight
 hatch, mid-tones into a wider hatch at a different angle, one light band into
-paw prints, boundaries kept as pen 1 linework. Detail thinner than the sampling
-grid, such as whiskers, will not survive banding at any setting; draw those as
-curves.
+paw prints, and the boundaries kept as pen 1 linework. Anything thinner than the
+sampling grid, whiskers for instance, won't survive banding at any setting. Draw
+those as curves.
 
 ![pointillism](screenshots/canvas/pointillism.png)
 
@@ -421,16 +421,16 @@ spiral-filled so it reads as a solid at pen width.
 
 ![ascii](screenshots/canvas/ascii.png)
 
-ASCII SHADER renders an image as drawn characters. Rather than mapping
-brightness onto a ramp, each cell is sampled into a 3×3 grid and the character
-whose own ink distribution best matches is chosen, so edges survive: an edge
-running bottom-left to top-right picks `/`, a horizontal one picks `=` or `_`.
-The `edge` slider trades shape-matching against pure density.
+ASCII SHADER renders an image as drawn characters. Instead of mapping brightness
+onto a ramp, each cell gets sampled into a 3×3 grid and matched against the
+character whose own ink distribution looks most like it, which keeps edges
+intact. An edge running bottom-left to top-right picks `/`, a horizontal one
+picks `=` or `_`. The `edge` slider trades shape-matching against pure density.
 (Technique after [alexharri.com/blog/ascii-rendering](https://alexharri.com/blog/ascii-rendering).)
 
-Auto-levels runs before matching and the range used is reported in the manifest;
-`gamma` applies on top. Characters with no glyph in the stroke font are dropped
-and named rather than silently drawing nothing.
+Auto-levels runs before matching, and the range it used shows up in the
+manifest. `gamma` applies on top of that. Characters with no glyph in the stroke
+font get dropped and named, rather than silently drawing nothing.
 
 ![ascii compare](screenshots/ascii_compare.png)
 
@@ -439,26 +439,26 @@ and named rather than silently drawing nothing.
 ![colour separation](screenshots/canvas/separation.png)
 
 Each pen lays a translucent film of its own ink, so on white paper the mixing is
-**subtractive**: a pen doesn't add its colour, it removes the rest. The
-separation works in absorption space (`absorb = 1 − colour`), where inks laid on
-the same spot add together, and asks how much of each pen reproduces the pixel:
+subtractive. A pen doesn't add its colour, it removes the rest. So the
+separation works in absorption space (`absorb = 1 − colour`), where inks on the
+same spot add together, and asks how much of each pen reproduces the pixel:
 
 > minimise ‖ Σᵢ xᵢ·absorbᵢ − absorb_target ‖² , with 0 ≤ xᵢ ≤ 1
 
-Each pen's coverage is drawn as a halftone dot whose **area** tracks coverage,
-on a grid rotated to that pen's own screen angle. Rotating the screens apart is
-what stops the passes forming moiré, the same reason process printing uses
+Each pen's coverage comes out as a halftone dot whose area tracks that coverage,
+on a grid rotated to the pen's own screen angle. Rotating the screens apart is
+what stops the passes forming moiré, same reason process printing uses
 15°/75°/0°/45°.
 
-The inks are whatever pens you actually own: the pen legend's colour swatches
+The inks are whatever pens you actually own. The pen legend's colour swatches
 wire straight into `inks`, so a black/red/amber set separates as black/red/amber
-rather than pretending to be CMYK.
+instead of pretending to be CMYK.
 
 ![separation proof](screenshots/separation_proof.png)
 
-**It is ink-hungry.** A 160 × 120 mm image at a 2.2 mm screen came to 10,198
-strokes and 65 m of line across three passes. `cell`, `gamma` and `max_ink` are
-the levers; `max_ink` caps total coverage per cell so the paper doesn't
+It's ink-hungry. A 160 × 120 mm image at a 2.2 mm screen came to 10,198 strokes
+and 65 m of line across three passes. `cell`, `gamma` and `max_ink` are the
+levers, and `max_ink` caps total coverage per cell so the paper doesn't
 saturate.
 
 ![ascii eva](screenshots/ascii_eva.png)
@@ -468,11 +468,11 @@ saturate.
 ![thinout](screenshots/canvas/thinout.png)
 
 Sits in the main flow with a bypass. When strokes run closer together than the
-pen is wide, the second lays ink on top of the first: no visual gain, full
-plot-time cost. THINOUT removes the covered portions at each pen's own stored
-width, culling each pen against itself only, since a red stroke beside a black
-one is not redundant. Longest strokes are processed first so the major linework
-survives.
+pen is wide, the second one just lays ink on top of the first. No visual gain,
+full plot-time cost. THINOUT removes the covered portions at each pen's own
+stored width, and only ever culls a pen against itself, since a red stroke
+beside a black one isn't redundant. Longest strokes go first so the major
+linework survives.
 
 On a dense plot: 52.25 m of ink → 46.47 m, 11% removed, no visible loss.
 
@@ -489,26 +489,26 @@ paper preview stays visible in every mode so curves can be oriented against it.
 
 #### Corner stop
 
-Alignment marks are scribed on the bed one inch in on both axes. Butt the
-sheet's front-left corner into them, pick the size from the **PAGE SIZE**
-dropdown, and the page frame is known outright: origin, size and orientation,
-with nothing taught and no camera.
+Alignment marks scribed on the bed, one inch in on both axes. Butt the sheet's
+front-left corner into them, pick the size from the PAGE SIZE dropdown, and the
+page frame is known outright: origin, size and orientation, nothing taught and
+no camera.
 
-This is the most repeatable of the five modes, because nothing is measured. A
+It's the most repeatable of the five modes because nothing is measured. A
 scribed mark survives a power cycle, a paper change and a week away from the
-machine. The tradeoff is that the sheet has to actually be against the stop; a
-sheet dropped roughly in place is wrong in a way the software cannot see.
+machine. The catch is that the sheet has to actually be against the stop. Drop
+one roughly in place and it's wrong in a way the software has no way of seeing.
 
-The datum is a **pen-space** coordinate, unlike the taught corners, which are
-stored as nozzle positions and have the pen offset added back when used. Default
-is 25.4, 25.4. Wire a point into `corner` to override it.
+The datum is a pen-space coordinate, unlike the taught corners, which are stored
+as nozzle positions and get the pen offset added back when used. Default is
+25.4, 25.4. Wire a point into `corner` to override it.
 
-Orientation is baked into the size choice (a landscape A4 is simply `297x210`)
-rather than a separate rotate toggle.
+Orientation is part of the size choice, so a landscape A4 is just `297x210`.
+No separate rotate toggle.
 
-**Not every page fits.** The pen reaches only to about Y292 while the bed is 350
-deep. Butted into the front-left datum, a portrait A4 runs to Y322 and its far
-end is undrawable. PLACE says so rather than silently clipping:
+Not every page fits. The pen only reaches about Y292 and the bed is 350 deep, so
+a portrait A4 butted into the front-left datum runs to Y322 and its far end is
+undrawable. PLACE says so instead of quietly clipping it:
 
 ```
 corner: … | page 210x297 at corner 25.4,25.4 -> X 25.4..235.4 Y 25.4..322.4
@@ -523,16 +523,17 @@ fit. Both A3 orientations and portrait Letter do not.
 
 ![titleblock](screenshots/canvas/titleblock.png)
 
-A parametric MAGI-style titleblock drawn with a **single-stroke engraving font**
+A parametric MAGI-style titleblock drawn with a single-stroke engraving font
 (`strokefont.py`), so every glyph is drawn once. It sizes itself to the
 registered sheet, reserves a strip at the bottom, and PLACE fits the artwork
-into what is left. Contents are live: pen names, estimated duration, scale,
+into whatever's left. Contents are live: pen names, estimated duration, scale,
 date. Two dropdowns pick which pens draw it.
 
-**Set the height explicitly.** The same value feeds both the block and PLACE's
-bottom reserve, and `0` means "size yourself from the text" to the block but
-"reserve nothing" to PLACE, so on auto the artwork centres on the whole sheet as
-though the block were not there.
+Set the height explicitly rather than leaving it at `0`. The same value feeds
+both the block and PLACE's bottom reserve, and `0` means two different things to
+them. The block reads it as "size yourself from the text", PLACE reads it as
+"reserve nothing", so the artwork ends up centred on the whole sheet as if the
+block wasn't there.
 
 ![titleblock placed](screenshots/titleblock_placed.png)
 
@@ -541,8 +542,9 @@ though the block were not there.
 ![gcode](screenshots/canvas/gcode.png)
 
 Sampling, per-pen passes, travel ordering, welding, the signature, the bounding
-box mime, and the manifest. Read the manifest before pressing PLOT. It refuses
-to run if the plot falls outside the paper or the machine.
+box mime, and the manifest. Worth reading the manifest before you press PLOT,
+though it refuses to run anyway if the plot falls outside the paper or the
+machine.
 
 ```
 JOB: 3 pass(es) | est 14.2 min (draw 8.3m, travel 4.1m)
@@ -561,31 +563,31 @@ pen 4: 2-opt: 17 reversals, travel 0.53m -> 0.48m (10% less pen-up)
 
 ![preview](screenshots/canvas/preview.png)
 
-PREVIEW draws the emission plan itself rather than the upstream geometry, so
-what you see is what the machine will do. The legend assigns each pen its
-viewport colour and, via the Custom Preview Lineweights, its real width, so
-a 0.8 mm roller looks like a 0.8 mm roller on screen.
+PREVIEW draws the emission plan rather than the upstream geometry, so what's on
+screen is what the machine will actually do. The legend gives each pen its
+viewport colour and, through the Custom Preview Lineweights, its real width. A
+0.8 mm roller looks like a 0.8 mm roller.
 
-Pressure is drawn as line **weight**, thin where the pen skims and fat where it
-digs in.
+Pressure shows up as line weight, thin where the pen skims and fat where it digs
+in.
 
 ![pen legend](screenshots/canvas/pen_legend.png)
 
-The 350 mm bed plate is internalised into the definition, so the canvas does not
-need the Rhino model open to show the machine.
+The 350 mm bed plate is internalised into the definition, so you don't need the
+Rhino model open for the canvas to show the machine.
 
 ---
 
 ## Files
 
-Every component's source lives in [`nodes/`](nodes). Each file is one GhPython
-component: the code is *pasted into* the component on the canvas rather than
+Every component's source is in [`nodes/`](nodes), one file per GhPython
+component. The code is pasted into the component on the canvas rather than
 imported by it, so these are the editable originals and `plotter.gh` carries the
 copy that actually runs. Edit the file, paste it in, save the definition.
 
-`strokefont.py` is the exception and stays in the root: it is `import`ed at
-runtime by the ASCII and titleblock components via an absolute `sys.path`, so
-moving it into `nodes/` breaks both.
+`strokefont.py` is the exception and stays in the root. The ASCII and titleblock
+components `import` it at runtime through an absolute `sys.path`, so moving it
+into `nodes/` breaks both.
 
 | File | What |
 |---|---|
@@ -642,62 +644,61 @@ moving it into `nodes/` breaks both.
 The thing all of the above actually drives. STLs are in
 [`hardware/pen_mount/`](hardware/pen_mount).
 
-It is **specific to the Archetype toolhead**. It is not a general-purpose
-adapter, and it will not fit a stock Stealthburner or a Dragon Burner without
-rework. It mounts in place of the extruder.
+It's specific to the Archetype toolhead. Not a general-purpose adapter, and it
+won't fit a stock Stealthburner or a Dragon Burner without rework. Mounts in
+place of the extruder.
 
 **Magnetic quick release.** The pen carrier is held on magnetically, so a pen
 change is a pull and a push rather than screws. A plot with four pens stops four
-times, and any fastener needing a tool turns each pause into a chance to nudge
-the machine.
+times, and any fastener that needs a tool turns each of those into a chance to
+nudge the machine.
 
 **Linear bearing from the Voron TAP system.** The carriage rides the same rail
-and bearing TAP uses: a known-good, widely available part with no play in the
-direction that matters. The pen carrier travels vertically on it.
+and bearing TAP uses. Known-good, widely available, and no play in the direction
+that matters. The pen carrier travels vertically on it.
 
 **Sprung on the rail.** Pen springs sit on the rail so the pen floats under
-constant force rather than being driven to a hard Z. The pen tracks paper that
-is not perfectly flat, and a small Z error becomes a small pressure change
-instead of a crash or a skipped line. `pen_down_z` sets nominal contact and the
-spring absorbs the rest.
+constant force instead of being driven to a hard Z. It tracks paper that isn't
+perfectly flat, and a small Z error turns into a small pressure change rather
+than a crash or a skipped line. `pen_down_z` sets nominal contact and the spring
+absorbs the rest.
 
-The spring is the reason for the `preload` parameter in the GCODE component: at
-draw height the tip is pressed roughly 1 mm into the paper by spring
-compression. **Travel hop must exceed the preload**, or the pen never leaves the
-page and drags a line through every travel move. 4 mm is a sane hop.
+That spring is why the GCODE component has a `preload` parameter. At draw height
+the tip is pressed about 1 mm into the paper by spring compression, so travel
+hop has to exceed the preload or the pen never leaves the page and drags a line
+through every travel move. 4 mm is a sane hop.
 
-**Self-centering collet.** The pen is gripped by a collet, so pens of different
-barrel diameters land on the same axis instead of leaning to whichever side a
-clamp pushes them. Without it, every pen change is also a lateral datum change,
-which the tool table cannot correct because it stores an offset per pen, not per
-insertion.
+**Self-centering collet.** Pens of different barrel diameters land on the same
+axis instead of leaning to whichever side a clamp pushes them. Without it every
+pen change is also a lateral datum change, and the tool table can't correct for
+that because it stores an offset per pen, not per insertion.
 
 **Frog face on top.** No function. It is a small frog. It is on top.
 
 ### Datums
 
 The tool table stores an XYZ datum per pen, measured by touching the tip to the
-calibration dot. That corrects for pens being different lengths and sitting at
-different depths, but it stores one offset per *pen*, not per *insertion*, so
-the mount has to make re-seating repeatable on its own. Measured across a
-pen-out / home / QGL / pen-in cycle, the same pen returned to within **0.6 mm**.
+calibration dot. That covers pens being different lengths and sitting at
+different depths, but it's one offset per pen, not per insertion, so the mount
+has to make re-seating repeatable on its own. Across a pen-out / home / QGL /
+pen-in cycle the same pen came back to within 0.6 mm.
 
-Pen 1 is the datum every other pen is measured against, so a pen 1 re-seat
-shifts everything with nothing to compensate. If absolute position matters,
-re-touch the dot after fitting pen 1.
+Pen 1 is the datum everything else is measured against, so re-seating pen 1
+shifts the lot with nothing to compensate. If absolute position matters, re-touch
+the dot after fitting it.
 
-`toolhead draw height` in GCODE must equal pen 1's stored datum. The tool table
-only holds *differences between pens*; how far the mount holds a pen below the
-nozzle lives in that one number, so a mount change means updating it or nothing
-touches the paper.
+`toolhead draw height` in GCODE has to equal pen 1's stored datum. The tool
+table only holds differences between pens, so how far the mount holds a pen
+below the nozzle lives in that one number. Change the mount and you have to
+update it, or nothing touches the paper.
 
 ### Printing
 
-The fresh V3 export uses functional filenames. For a normal build, print the
-four numbered core parts plus **`Collet Default.stl`**. The default collet is
-intended to fit most pens. The 5–15 mm labelled collets are optional
-alternatives for known barrel diameters; they are not additional required
-parts. Sizes below are the measured STL bounding boxes, useful for plate layout:
+The V3 export uses functional filenames. For a normal build, print the four
+numbered core parts plus `Collet Default.stl`, which should fit most pens. The
+5–15 mm labelled collets are alternatives for a known barrel diameter, not
+additional parts you need. Sizes below are the measured STL bounding boxes,
+handy for plate layout:
 
 | File | Part | Qty | Triangles | Bounding box (mm) |
 |---|---|---:|---:|---|
