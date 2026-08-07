@@ -75,6 +75,12 @@ the printed pockets/holes before ordering if you change slicer compensation or
 exported geometry. Printable files, dimensions and datum notes are collected in
 the detailed [Pen mount](#pen-mount) section below.
 
+There's a dimensioned assembly drawing in
+[`Pen Mount Ortho V3.pdf`](hardware/pen_mount/Pen%20Mount%20Ortho%20V3.pdf),
+one A3 sheet with the orthographic views, balloons against the parts list and a
+titleblock. Worth having open while you assemble, and it's the reference to
+check a printed part against if something doesn't seat.
+
 ![collet and lock-nut detail](hardware/pen_mount/images/collet-detail.png)
 
 ---
@@ -657,6 +663,7 @@ into `nodes/` breaks both.
 | `paper_registration.json` | Last taught paper corners (also on the printer) |
 | `titleblock_brief.md` | Design brief the titleblock SVG was generated from |
 | `hardware/pen_mount/*.stl` | Printable parts for the pen mount (see below) |
+| `hardware/pen_mount/Pen Mount Ortho V3.pdf` | Dimensioned assembly drawing, A3 |
 
 ---
 
@@ -714,6 +721,9 @@ below the nozzle lives in that one number. Change the mount and you have to
 update it, or nothing touches the paper.
 
 ### Printing
+
+Dimensions and part numbers are on the
+[assembly drawing](hardware/pen_mount/Pen%20Mount%20Ortho%20V3.pdf).
 
 The V3 export uses functional filenames. For a normal build, print the four
 numbered core parts plus `Collet Default.stl`, which should fit most pens. The
