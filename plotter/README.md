@@ -275,6 +275,13 @@ in sync.
 Pattern generators are just curve sources. Baked Rhino curves work equally
 well, and slot 1 is wired for exactly that.
 
+| Generator | Character | |
+|---|---|---|
+| WARPED MESH | grid of lines pulled around attractor points | <img src="screenshots/swatch/warped_mesh.png" width="150"> |
+| LAKE RIPPLES | horizon lines pinched into waves, with perspective | <img src="screenshots/swatch/lake_ripples.png" width="150"> |
+| RADIAL DROPS | ripples radiating from one or two drop points | <img src="screenshots/swatch/radial_drops.png" width="150"> |
+| CONCENTRIC CIRCLES | rings with graph-driven spacing | <img src="screenshots/swatch/concentric_circles.png" width="150"> |
+
 ### Border and frame
 
 ![frame styles](screenshots/frame_styles.png)
@@ -333,10 +340,20 @@ that a source is producing junk than to have it take the whole table down.
 
 ![line processors](screenshots/canvas/processors_line.png)
 
-DASH, VARIABLE DASH (ink/gap driven by length or attractor proximity),
-CHROMATIC ABERRATION (splits a curve into offset colour steps across pens),
-CROP (clips to any closed shape, even-odd so nested shapes cut holes), and
-PRESSURE (writes the Z channel from curvature / proximity / image / noise).
+These take curves and hand curves back, so they chain in any order. Samples
+below are all the same nine wavy lines put through each one.
+
+| Processor | Character | |
+|---|---|---|
+| DASH | even ink/gap dashing | <img src="screenshots/swatch/dash.png" width="150"> |
+| VARIABLE DASH | ink/gap driven by length along the line or attractor proximity | <img src="screenshots/swatch/vardash.png" width="150"> |
+| CROP | clips to any closed shape, even-odd so nested shapes cut holes | <img src="screenshots/swatch/crop.png" width="150"> |
+| CHROMATIC ABERRATION | splits a curve into offset colour steps across pens | <img src="screenshots/swatch/chromatic.png" width="150"> |
+| PRESSURE | writes the Z channel from curvature, proximity, image or noise | <img src="screenshots/swatch/pressure.png" width="150"> |
+
+The chromatic sample is drawn one colour per step to show the fan; on paper each
+step is a separate pen pass. Pressure has no 2D shape of its own, so it's drawn
+at line weight from `|Z|`, the same way the viewport shows it.
 
 The rack sits off the main path, fed by a relay called FX IN that's empty by
 default, so nothing in here touches a plot until you wire it up. Drag a slot
@@ -374,6 +391,18 @@ doesn't move when something upstream changes.
 ![fill patterns 2](screenshots/fill_patterns2.png)
 
 ### Image processors
+
+Each takes a closed region and an image, and fills the region with marks made
+from the picture. Samples are the same photo through each one, on an 80 mm
+square.
+
+| Processor | Character | |
+|---|---|---|
+| TONE REGIONS | image cut into closed tone bands that the fills can use | <img src="screenshots/swatch/tone.png" width="150"> |
+| POINTILLISM | dots, density or halftone or scattered, each spiral-filled | <img src="screenshots/swatch/pointillism.png" width="150"> |
+| ASCII SHADER | drawn characters, matched by shape rather than brightness | <img src="screenshots/swatch/ascii.png" width="150"> |
+| STIPPLE / TSP | blue-noise dots, or one continuous tour through them | <img src="screenshots/fills/stipple.png" width="150"> |
+| COLOUR SEPARATION | one halftone pass per pen, screens angled apart | <img src="screenshots/separation_proof.png" width="150"> |
 
 #### Tone regions
 
